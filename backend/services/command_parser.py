@@ -101,6 +101,18 @@ def _build_fallback_command(text: str) -> DrawCommand:
             speak="正在导出图片",
         )
 
+    # AI 生成：包含"画"但不是基础图形时，走 DALL-E
+    basic_shapes = ["圆", "矩形", "方", "直线", "线", "三角", "正方形", "长方形"]
+    if "画" in text and not any(shape in text for shape in basic_shapes):
+        # 提取"画"后面的内容作为 prompt
+        prompt = text.split("画", 1)[-1].strip() or text
+        return DrawCommand(
+            type=CommandType.AI_GENERATE,
+            prompt=prompt,
+            confidence=0.5,
+            speak=f"正在尝试生成：{prompt}",
+        )
+
     # 无法识别
     return DrawCommand(
         type=CommandType.CANVAS_ACTION,
