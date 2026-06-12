@@ -1,122 +1,75 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useRef } from 'react';
+import * as fabric from 'fabric';
+import DrawingCanvas from './components/DrawingCanvas';
+import { CanvasHistory } from './lib/canvasHistory';
+import { executeCommand, DrawCommand } from './lib/canvasExecutor';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const canvasRef = useRef<fabric.Canvas | null>(null);
+  const historyRef = useRef<CanvasHistory | null>(null);
+
+  const handleTestCommand = () => {
+    const cmd: DrawCommand = {
+      type: 'canvas_action',
+      action: 'draw',
+      target: { type: 'circle' },
+      params: { fill: '#FF0000', radius: 60 },
+    };
+    if (canvasRef.current) {
+      const result = executeCommand(canvasRef.current, cmd);
+      console.log('执行结果:', result);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (historyRef.current) {
+      await historyRef.current.undo();
+    }
+  };
+
+  const handleRedo = async () => {
+    if (historyRef.current) {
+      await historyRef.current.redo();
+    }
+  };
+
+  const handleClear = () => {
+    if (canvasRef.current) {
+      executeCommand(canvasRef.current, { type: 'canvas_action', action: 'clear' });
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app">
+      <header className="toolbar">
+        <h1 className="toolbar-title">🎤 Voice Canvas</h1>
+        <div className="toolbar-actions">
+          <button onClick={handleTestCommand} className="btn btn-test">
+            测试画圆
+          </button>
+          <button onClick={handleUndo} className="btn">
+            撤销
+          </button>
+          <button onClick={handleRedo} className="btn">
+            重做
+          </button>
+          <button onClick={handleClear} className="btn btn-danger">
+            清空
+          </button>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+      </header>
 
-      <div className="ticks"></div>
+      <main className="canvas-area">
+        <DrawingCanvas canvasRef={canvasRef} historyRef={historyRef} />
+      </main>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <footer className="status-bar">
+        <span>语音指令待接入</span>
+        <span>F12 控制台查看日志</span>
+      </footer>
+    </div>
+  );
 }
 
-export default App
+export default App;
