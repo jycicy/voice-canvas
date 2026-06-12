@@ -8,7 +8,8 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 import * as fabric from 'fabric';
 import { useSpeechRecognition } from './useSpeechRecognition';
 import { parseCommand, generateImage } from '../lib/api';
-import { executeCommand, DrawCommand } from '../lib/canvasExecutor';
+import { executeCommand } from '../lib/canvasExecutor';
+import type { DrawCommand } from '../lib/canvasExecutor';
 import { CanvasHistory } from '../lib/canvasHistory';
 
 export type ProcessingState = 'idle' | 'listening' | 'parsing' | 'executing' | 'generating';
