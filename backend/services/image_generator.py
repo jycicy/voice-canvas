@@ -1,23 +1,26 @@
-"""DALL-E 3 图像生成服务
+"""图像生成服务
 
-调用 DALL-E 3 API 生成图像，返回图片 URL。
+通过环境变量配置 API 地址、模型、Key，切换模型无需改代码。
+兼容 OpenAI images 格式的 API（OpenAI、Agnes、小米等）。
 """
 
 import os
 
-from openai import AsyncOpenAI
+import httpx
 
 
-def _get_client() -> AsyncOpenAI:
-    """创建 OpenAI 客户端"""
-    return AsyncOpenAI(
-        api_key=os.getenv("OPENAI_API_KEY", ""),
-        base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-    )
+def _get_config() -> dict:
+    """从环境变量读取图像生成配置"""
+    return {
+        "api_url": os.getenv("IMAGE_API_URL", "https://apihub.agnes-ai.com/v1/images/generations"),
+        "api_key": os.getenv("IMAGE_API_KEY", ""),
+        "model": os.getenv("IMAGE_MODEL", "agnes-image-2.1-flash"),
+        "size": os.getenv("IMAGE_SIZE", "1024x768"),
+    }
 
 
 async def generate_image(prompt: str) -> dict:
-    """调用 DALL-E 3 生成图像
+    """调用图像生成 API
 
     Args:
         prompt: 图像描述提示词
@@ -28,22 +31,29 @@ async def generate_image(prompt: str) -> dict:
     Raises:
         Exception: API 调用失败时抛出异常
     """
-    client = _get_client()
+    cfg = _get_config()
 
-    # 优化中文 prompt（DALL-E 3 对英文效果更好）
-    enhanced_prompt = prompt
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.post(
+            cfg["api_url"],
+            headers={
+                "Authorization": f"Bearer {cfg['api_key']}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": cfg["model"],
+                "prompt": prompt,
+                "size": cfg["size"],
+            },
+        )
 
-    response = await client.images.generate(
-        model="dall-e-3",
-        prompt=enhanced_prompt,
-        size="1024x1024",
-        quality="standard",
-        n=1,
-    )
+        response.raise_for_status()
+        data = response.json()
 
-    image_data = response.data[0]
+        # 兼容 OpenAI 格式响应：{"data": [{"url": "..."}]}
+        image_url = data["data"][0].get("url") or data["data"][0].get("b64_json", "")
 
-    return {
-        "url": image_data.url,
-        "revised_prompt": image_data.revised_prompt or prompt,
-    }
+        return {
+            "url": image_url,
+            "revised_prompt": prompt,
+        }
