@@ -141,27 +141,80 @@ async def parse_command(text: str) -> DrawCommand:
     client = _get_client()
     model = os.getenv("LLM_MODEL", "mimo-v2.5-pro")
 
-    try:
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "你是一个语音绘图指令解析器。只输出 JSON，不要输出其他内容。"},
-                {"role": "user", "content": full_prompt},
-            ],
-            temperature=0.1,
-            max_tokens=1000,
-        )
+    # 重试逻辑：最多 3 次，指数退避
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "你是一个语音绘图指令解析器。只输出 JSON，不要输出其他内容。"},
+                    {"role": "user", "content": full_prompt},
+                ],
+                temperature=0.1,
+                max_tokens=1000,
+            )
 
-        content = response.choices[0].message.content or ""
-        print(f"[command_parser] LLM 原始返回: {content!r}")
-        data = _extract_json(content)
+            content = response.choices[0].message.content or ""
+            print(f"[command_parser] LLM 原始返回 (attempt {attempt + 1}): {content!r}")
 
-        # 修正 action 字段为枚举值
-        if "action" in data and isinstance(data["action"], str):
-            pass  # Pydantic 会自动处理字符串到枚举的转换
+            if not content.strip():
+                raise ValueError("LLM 返回空内容")
 
-        return DrawCommand(**data)
+            data = _extract_json(content)
+            return DrawCommand(**data)
 
-    except Exception as e:
-        print(f"[command_parser] LLM 解析失败: {e}")
-        return _build_fallback_command(text)
+        except Exception as e:
+            last_error = e
+            print(f"[command_parser] 第 {attempt + 1} 次解析失败: {e}")
+            if attempt < 2:
+                import asyncio
+                await asyncio.sleep(0.5 * (2 ** attempt))  # 指数退避: 0.5s, 1s
+
+    print(f"[command_parser] 3 次重试均失败，使用兜底: {last_error}")
+    return _build_fallback_command(text)
+
+
+async def parse_compound_command(text: str) -> list[DrawCommand]:
+    """解析复合指令，返回多个命令
+
+    例如 "画三个红色圆形排成一排" → 3 个 draw 命令
+    """
+    # 检测是否包含数量关键词
+    count_match = re.search(r"([一二三四五六七八九十\d]+)\s*个", text)
+    if not count_match:
+        # 非复合指令，返回单个命令
+        cmd = await parse_command(text)
+        return [cmd]
+
+    # 中文数字映射
+    cn_num = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+    count_str = count_match.group(1)
+    count = cn_num.get(count_str, int(count_str) if count_str.isdigit() else 1)
+
+    # 限制最多 10 个，避免语音误识别
+    count = min(count, 10)
+
+    # 解析单个命令的语义
+    single_text = re.sub(r"[一二三四五六七八九十\d]+\s*个", "一个", text)
+    cmd = await parse_command(single_text)
+
+    # 如果解析失败或不是 draw 类型，直接返回单个命令
+    if cmd.type != CommandType.CANVAS_ACTION or cmd.action != "draw":
+        return [cmd]
+
+    # 根据数量生成多个命令，水平排列
+    commands = []
+    spacing = 150  # 对象间距
+    total_width = (count - 1) * spacing
+    start_x = -total_width / 2
+
+    for i in range(count):
+        import copy
+        new_cmd = copy.deepcopy(cmd)
+        if new_cmd.params:
+            new_cmd.params.left = start_x + i * spacing
+        new_cmd.speak = f"正在绘制第 {i + 1} 个"
+        commands.append(new_cmd)
+
+    return commands

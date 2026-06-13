@@ -174,3 +174,39 @@ html, body, #root {
   font-size: 13px;
   color: #ff6666;
 }
+
+/* 建议指令列表 */
+.suggestion-list {
+  padding: 8px 16px;
+  background: #16213e;
+  border-top: 1px solid #1a3a5c;
+}
+
+.suggestion-title {
+  font-size: 13px;
+  color: #aab;
+  margin-bottom: 8px;
+}
+
+.suggestion-items {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.suggestion-btn {
+  padding: 6px 14px;
+  border: 1px solid #2a4a7c;
+  border-radius: 16px;
+  background: #1a2a4e;
+  color: #88bbff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.suggestion-btn:hover {
+  background: #2a4a7c;
+  color: #fff;
+  border-color: #4a7aff;
+}

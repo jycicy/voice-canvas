@@ -22,6 +22,8 @@ export interface DrawParams {
   scaleX?: number;
   scaleY?: number;
   opacity?: number;
+  dash?: number[];
+  lineHeight?: number;
 }
 
 /** 绘图目标 */
@@ -33,12 +35,13 @@ export interface DrawTarget {
 /** 完整绘图命令 */
 export interface DrawCommand {
   type: 'canvas_action' | 'ai_generate';
-  action?: 'draw' | 'modify' | 'move' | 'scale' | 'rotate' | 'delete' | 'select' | 'clear' | 'undo' | 'redo' | 'export';
+  action?: 'draw' | 'modify' | 'move' | 'scale' | 'rotate' | 'delete' | 'select' | 'clear' | 'undo' | 'redo' | 'export' | 'zoomIn' | 'zoomOut' | 'resetView';
   target?: DrawTarget;
   params?: DrawParams;
   prompt?: string;
   confidence?: number;
   speak?: string;
+  alternatives?: { label: string; command: DrawCommand }[];
 }
 
 /** 命令执行结果 */
@@ -186,6 +189,13 @@ function executeModify(
   if (params?.angle !== undefined) active.rotate(params.angle);
   if (params?.scaleX) active.set('scaleX', params.scaleX);
   if (params?.scaleY) active.set('scaleY', params.scaleY);
+  if (params?.dash) active.set('strokeDashArray', params.dash);
+  if (params?.lineHeight) active.set('lineHeight', params.lineHeight);
+
+  // 文字对象支持修改内容
+  if (params?.text && active instanceof fabric.Textbox) {
+    active.set('text', params.text);
+  }
 
   canvas.renderAll();
   return { success: true, message: '已修改对象属性' };
@@ -332,6 +342,39 @@ function executeRotate(
 }
 
 /**
+ * 执行画布缩放
+ */
+function executeZoom(
+  canvas: fabric.Canvas,
+  action: string,
+): ExecuteResult {
+  let zoom = canvas.getZoom();
+  const step = 0.2;
+
+  switch (action) {
+    case 'zoomIn':
+      zoom = Math.min(zoom + step, 5);
+      break;
+    case 'zoomOut':
+      zoom = Math.max(zoom - step, 0.2);
+      break;
+    case 'resetView':
+      zoom = 1;
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      canvas.renderAll();
+      return { success: true, message: '已重置视图' };
+  }
+
+  canvas.zoomToPoint(
+    new fabric.Point(canvas.getWidth() / 2, canvas.getHeight() / 2),
+    zoom,
+  );
+  canvas.renderAll();
+  const pct = Math.round(zoom * 100);
+  return { success: true, message: `画布缩放至 ${pct}%` };
+}
+
+/**
  * 主执行函数：根据命令类型分发到对应处理函数
  */
 export function executeCommand(
@@ -372,6 +415,11 @@ export function executeCommand(
     case 'redo':
       // 由 canvasHistory 处理，这里返回占位
       return { success: true, message: action === 'undo' ? '已撤销' : '已重做' };
+
+    case 'zoomIn':
+    case 'zoomOut':
+    case 'resetView':
+      return executeZoom(canvas, action!);
 
     case 'export': {
       const dataUrl = canvas.toDataURL({ format: 'png', quality: 1 });

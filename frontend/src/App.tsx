@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import * as fabric from 'fabric';
 import DrawingCanvas from './components/DrawingCanvas';
 import VoiceControl from './components/VoiceControl';
+import { SuggestionList } from './components/SuggestionList';
 import { CanvasHistory } from './lib/canvasHistory';
 import { useVoiceCanvas } from './hooks/useVoiceCanvas';
 import './App.css';
@@ -28,6 +29,13 @@ function App() {
       <main className="canvas-area">
         <DrawingCanvas canvasRef={canvasRef} historyRef={historyRef} />
       </main>
+
+      {/* 建议指令列表 */}
+      <SuggestionList
+        alternatives={voice.alternatives}
+        onSelect={voice.selectAlternative}
+        visible={voice.alternatives.length > 0}
+      />
 
       {/* 底部语音控制区 */}
       <footer className="voice-footer">

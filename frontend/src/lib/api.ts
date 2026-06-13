@@ -14,6 +14,12 @@ interface ParseResponse {
   raw_text: string;
 }
 
+/** 复合指令解析响应 */
+interface CompoundParseResponse {
+  commands: DrawCommand[];
+  raw_text: string;
+}
+
 /** SSE 事件回调 */
 interface GenerateCallbacks {
   onGenerating?: (data: { message: string; prompt: string }) => void;
@@ -33,6 +39,23 @@ export async function parseCommand(text: string): Promise<ParseResponse> {
 
   if (!res.ok) {
     throw new Error(`解析请求失败: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * 解析复合指令（支持 "画三个圆形" 等批量操作）
+ */
+export async function parseCompoundCommand(text: string): Promise<CompoundParseResponse> {
+  const res = await fetch(`${API_BASE}/api/parse-compound`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`复合指令解析失败: ${res.status}`);
   }
 
   return res.json();
