@@ -146,3 +146,40 @@ export async function healthCheck(): Promise<boolean> {
     return false;
   }
 }
+
+// ---- 画布状态管理 ----
+
+/** 生成或获取 session ID（基于浏览器，持久化到 localStorage） */
+export function getSessionId(): string {
+  let id = localStorage.getItem('voice-canvas-session-id');
+  if (!id) {
+    id = 'session-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem('voice-canvas-session-id', id);
+  }
+  return id;
+}
+
+/** 保存画布状态到后端 */
+export async function saveCanvasState(sessionId: string, canvasJson: object): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/canvas/state/${sessionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ canvas_json: canvasJson }),
+    });
+  } catch {
+    // 静默失败，不影响主流程
+  }
+}
+
+/** 从后端恢复画布状态 */
+export async function loadCanvasState(sessionId: string): Promise<object | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/canvas/state/${sessionId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.canvas_json;
+  } catch {
+    return null;
+  }
+}

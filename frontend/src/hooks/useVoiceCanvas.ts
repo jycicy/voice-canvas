@@ -7,7 +7,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import * as fabric from 'fabric';
 import { useSpeechRecognition } from './useSpeechRecognition';
-import { parseCompoundCommand, generateImage } from '../lib/api';
+import { parseCompoundCommand, generateImage, saveCanvasState, getSessionId } from '../lib/api';
 import { executeCommand } from '../lib/canvasExecutor';
 import type { DrawCommand } from '../lib/canvasExecutor';
 import { CanvasHistory } from '../lib/canvasHistory';
@@ -52,6 +52,18 @@ export function useVoiceCanvas(
   const speech = useSpeechRecognition();
   const processingRef = useRef(false);
   const lastFinalRef = useRef('');
+
+  // 保存画布状态到后端（防抖）
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveCanvas = useCallback(() => {
+    if (!canvasRef.current) return;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const json = canvasRef.current!.toJSON();
+      const sessionId = getSessionId();
+      saveCanvasState(sessionId, json);
+    }, 500);
+  }, [canvasRef]);
 
   // TTS 语音反馈
   const speak = useCallback((text: string) => {
@@ -126,6 +138,7 @@ export function useVoiceCanvas(
               canvas.renderAll();
               speak('图片已生成');
               setLastMessage('图片已添加到画布');
+              saveCanvas();
             } catch (e) {
               speak('图片加载失败');
               setLastMessage('图片加载失败');
@@ -155,6 +168,7 @@ export function useVoiceCanvas(
               : lastResult.message;
             speak(msg);
             setLastMessage(msg);
+            saveCanvas();
           }
         }
       } catch (e: any) {
@@ -189,9 +203,10 @@ export function useVoiceCanvas(
         setLastMessage(result.message);
         processingRef.current = false;
         setState('idle');
+        saveCanvas();
       }
     },
-    [canvasRef, speak],
+    [canvasRef, speak, saveCanvas],
   );
 
   // 监听语音识别的 finalText 变化
