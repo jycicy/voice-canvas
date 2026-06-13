@@ -153,6 +153,7 @@ async def parse_command(text: str) -> DrawCommand:
         )
 
         content = response.choices[0].message.content or ""
+        print(f"[command_parser] LLM 原始返回: {content!r}")
         data = _extract_json(content)
 
         # 修正 action 字段为枚举值

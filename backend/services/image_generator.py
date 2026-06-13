@@ -26,7 +26,7 @@ async def generate_image(prompt: str) -> dict:
         prompt: 图像描述提示词
 
     Returns:
-        dict: {"url": 图片URL, "revised_prompt": 修订后的提示词}
+        dict: {"url": 图片 data URL 或 http URL, "revised_prompt": 修订后的提示词}
 
     Raises:
         Exception: API 调用失败时抛出异常
@@ -44,14 +44,22 @@ async def generate_image(prompt: str) -> dict:
                 "model": cfg["model"],
                 "prompt": prompt,
                 "size": cfg["size"],
+                "response_format": "b64_json",
             },
         )
 
         response.raise_for_status()
         data = response.json()
 
-        # 兼容 OpenAI 格式响应：{"data": [{"url": "..."}]}
-        image_url = data["data"][0].get("url") or data["data"][0].get("b64_json", "")
+        # 兼容 OpenAI 格式响应：{"data": [{"b64_json": "..."}]} 或 {"data": [{"url": "..."}]}
+        item = data["data"][0]
+        b64 = item.get("b64_json", "")
+        url = item.get("url", "")
+
+        if b64:
+            image_url = f"data:image/png;base64,{b64}"
+        else:
+            image_url = url
 
         return {
             "url": image_url,

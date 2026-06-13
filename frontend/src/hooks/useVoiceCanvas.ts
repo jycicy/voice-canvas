@@ -88,9 +88,7 @@ export function useVoiceCanvas(
           // 将图片加载到画布
           if (imageUrl && canvasRef.current) {
             try {
-              const img = await fabric.FabricImage.fromURL(imageUrl, {
-                crossOrigin: 'anonymous',
-              });
+              const img = await fabric.FabricImage.fromURL(imageUrl);
               const canvas = canvasRef.current;
               const scale = Math.min(
                 (canvas.getWidth() * 0.6) / img.width!,
