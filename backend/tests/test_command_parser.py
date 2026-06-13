@@ -113,3 +113,54 @@ class TestParseCommand:
             cmd = await parse_command("画一只猫")
 
         assert cmd.type == CommandType.AI_GENERATE
+
+    @pytest.mark.asyncio
+    async def test_parse_scale_command(self):
+        """解析放大命令"""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"type": "canvas_action", "action": "scale", "params": {"scaleX": 2, "scaleY": 2}, "confidence": 0.9, "speak": "已放大两倍"}'
+
+        with patch("services.command_parser._get_client") as mock_get_client:
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_client
+
+            cmd = await parse_command("放大两倍")
+
+        assert cmd.action == "scale"
+        assert cmd.params.scale_x == 2
+
+    @pytest.mark.asyncio
+    async def test_parse_rotate_command(self):
+        """解析旋转命令"""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"type": "canvas_action", "action": "rotate", "params": {"angle": 45}, "confidence": 0.9, "speak": "已旋转45度"}'
+
+        with patch("services.command_parser._get_client") as mock_get_client:
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_client
+
+            cmd = await parse_command("旋转45度")
+
+        assert cmd.action == "rotate"
+        assert cmd.params.angle == 45
+
+    @pytest.mark.asyncio
+    async def test_parse_select_last_command(self):
+        """解析选中最后绘制对象命令"""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"type": "canvas_action", "action": "select", "target": {"type": "last"}, "confidence": 0.9, "speak": "已选中最后绘制的对象"}'
+
+        with patch("services.command_parser._get_client") as mock_get_client:
+            mock_client = AsyncMock()
+            mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+            mock_get_client.return_value = mock_client
+
+            cmd = await parse_command("选中刚才画的")
+
+        assert cmd.action == "select"
+        assert cmd.target.type == "last"

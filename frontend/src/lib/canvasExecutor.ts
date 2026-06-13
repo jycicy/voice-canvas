@@ -33,7 +33,7 @@ export interface DrawTarget {
 /** 完整绘图命令 */
 export interface DrawCommand {
   type: 'canvas_action' | 'ai_generate';
-  action?: string;
+  action?: 'draw' | 'modify' | 'move' | 'scale' | 'rotate' | 'delete' | 'select' | 'clear' | 'undo' | 'redo' | 'export';
   target?: DrawTarget;
   params?: DrawParams;
   prompt?: string;
@@ -228,6 +228,15 @@ function executeSelect(
     return { success: false, message: '画布上没有对象' };
   }
 
+  // 选中最后绘制的对象
+  if (target?.type === 'last') {
+    const last = objects[objects.length - 1];
+    canvas.setActiveObject(last);
+    canvas.renderAll();
+    return { success: true, message: '已选中最后绘制的对象' };
+  }
+
+  // 选中所有对象
   if (target?.type === 'all') {
     const sel = new fabric.ActiveSelection(objects, { canvas });
     canvas.setActiveObject(sel);
@@ -251,9 +260,75 @@ function executeSelect(
     return { success: false, message: '未找到匹配的对象' };
   }
 
+  // 选中最后一个匹配对象（最新的）
   canvas.setActiveObject(filtered[filtered.length - 1]);
   canvas.renderAll();
-  return { success: true, message: `已选中 ${filtered.length} 个对象` };
+  return { success: true, message: `已选中 ${filtered.length} 个匹配对象` };
+}
+
+/**
+ * 执行 move 操作（移动选中对象）
+ */
+function executeMove(
+  canvas: fabric.Canvas,
+  params?: DrawParams,
+): ExecuteResult {
+  const active = canvas.getActiveObject();
+  if (!active) {
+    return { success: false, message: '没有选中的对象，请先选中一个对象' };
+  }
+
+  const dx = params?.left ?? 0;
+  const dy = params?.top ?? 0;
+  active.set({
+    left: (active.left ?? 0) + dx,
+    top: (active.top ?? 0) + dy,
+  });
+  active.setCoords();
+  canvas.renderAll();
+  return { success: true, message: '已移动对象' };
+}
+
+/**
+ * 执行 scale 操作（缩放选中对象）
+ */
+function executeScale(
+  canvas: fabric.Canvas,
+  params?: DrawParams,
+): ExecuteResult {
+  const active = canvas.getActiveObject();
+  if (!active) {
+    return { success: false, message: '没有选中的对象，请先选中一个对象' };
+  }
+
+  const scaleX = params?.scaleX ?? 1;
+  const scaleY = params?.scaleY ?? scaleX;
+  active.set({
+    scaleX: (active.scaleX ?? 1) * scaleX,
+    scaleY: (active.scaleY ?? 1) * scaleY,
+  });
+  canvas.renderAll();
+
+  const pct = Math.round(scaleX * 100);
+  return { success: true, message: `已缩放对象至 ${pct}%` };
+}
+
+/**
+ * 执行 rotate 操作（旋转选中对象）
+ */
+function executeRotate(
+  canvas: fabric.Canvas,
+  params?: DrawParams,
+): ExecuteResult {
+  const active = canvas.getActiveObject();
+  if (!active) {
+    return { success: false, message: '没有选中的对象，请先选中一个对象' };
+  }
+
+  const angle = params?.angle ?? 0;
+  active.set('angle', (active.angle ?? 0) + angle);
+  canvas.renderAll();
+  return { success: true, message: `已旋转 ${angle} 度` };
 }
 
 /**
@@ -277,6 +352,15 @@ export function executeCommand(
 
     case 'select':
       return executeSelect(canvas, target);
+
+    case 'move':
+      return executeMove(canvas, params);
+
+    case 'scale':
+      return executeScale(canvas, params);
+
+    case 'rotate':
+      return executeRotate(canvas, params);
 
     case 'clear':
       canvas.clear();
