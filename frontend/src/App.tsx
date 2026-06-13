@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import * as fabric from 'fabric';
 import DrawingCanvas from './components/DrawingCanvas';
 import VoiceControl from './components/VoiceControl';
 import { SuggestionList } from './components/SuggestionList';
 import { CanvasHistory } from './lib/canvasHistory';
 import { useVoiceCanvas } from './hooks/useVoiceCanvas';
+import { loadCanvasState, getSessionId } from './lib/api';
 import './App.css';
 
 function App() {
@@ -12,6 +13,21 @@ function App() {
   const historyRef = useRef<CanvasHistory | null>(null);
 
   const voice = useVoiceCanvas(canvasRef, historyRef);
+
+  // 页面加载时恢复画布状态
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const sessionId = getSessionId();
+    loadCanvasState(sessionId).then((state) => {
+      if (state && typeof state === 'object' && Object.keys(state).length > 0) {
+        canvas.loadFromJSON(state).then(() => {
+          canvas.renderAll();
+        });
+      }
+    });
+  }, []);
 
   return (
     <div className="app">
