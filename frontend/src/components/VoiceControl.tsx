@@ -1,7 +1,7 @@
 /**
- * 语音控制面板
+ * 语音控制组件
  *
- * 提供语音按钮、实时识别文字展示、状态指示、波形动画。
+ * 包含麦克风按钮和状态显示。
  */
 
 import type { ProcessingState } from '../hooks/useVoiceCanvas';
@@ -17,7 +17,6 @@ interface VoiceControlProps {
   onStop: () => void;
 }
 
-/** 状态对应的中文文案 */
 const STATE_LABELS: Record<ProcessingState, string> = {
   idle: '等待指令',
   listening: '正在聆听...',
@@ -26,7 +25,7 @@ const STATE_LABELS: Record<ProcessingState, string> = {
   generating: 'AI 正在作画...',
 };
 
-export default function VoiceControl({
+export function VoiceControl({
   isListening,
   isSupported,
   state,
@@ -36,8 +35,13 @@ export default function VoiceControl({
   onStart,
   onStop,
 }: VoiceControlProps) {
+  const isActive = isListening;
+  const isGenerating = state === 'generating';
+  const isDisabled = !isSupported || isGenerating;
+
   const handleClick = () => {
-    if (isListening) {
+    if (isDisabled) return;
+    if (isActive) {
       onStop();
     } else {
       onStart();
@@ -46,48 +50,47 @@ export default function VoiceControl({
 
   return (
     <div className="voice-control">
-      {/* 语音按钮 */}
+      {/* 麦克风按钮 */}
       <button
-        className={`voice-btn ${isListening ? 'voice-btn--active' : ''} ${
-          state === 'generating' ? 'voice-btn--generating' : ''
-        }`}
+        className={`voice-btn ${isActive ? 'voice-btn--active' : ''} ${isGenerating ? 'voice-btn--generating' : ''}`}
         onClick={handleClick}
-        disabled={!isSupported || state === 'generating'}
-        title={isSupported ? '点击开始/停止语音' : '浏览器不支持语音识别'}
+        disabled={isDisabled}
+        title={isActive ? '停止聆听' : '开始聆听'}
       >
-        <span className="voice-btn-icon">{isListening ? '🔴' : '🎤'}</span>
-        {/* 录音波形动画 */}
-        {isListening && (
+        {isActive ? (
           <div className="voice-waves">
-            <span className="wave" /><span className="wave" /><span className="wave" />
+            <span className="voice-wave"></span>
+            <span className="voice-wave"></span>
+            <span className="voice-wave"></span>
           </div>
+        ) : (
+          '🎤'
         )}
       </button>
 
-      {/* 状态与识别文字 */}
+      {/* 状态信息 */}
       <div className="voice-info">
         <div className="voice-status">
-          <span className={`status-dot ${isListening ? 'status-dot--active' : ''}`} />
-          <span>{STATE_LABELS[state]}</span>
+          <span className={`status-dot ${isActive ? 'status-dot--active' : ''}`}></span>
+          <span className="status-label">{STATE_LABELS[state]}</span>
         </div>
 
         {recognizedText && (
-          <div className="voice-text">
-            {state === 'listening' ? '🗣️ ' : '✅ '}
+          <div className="voice-text voice-text--result">
             {recognizedText}
           </div>
         )}
 
-        {lastMessage && !recognizedText && (
-          <div className="voice-message">💬 {lastMessage}</div>
-        )}
-
         {error && (
-          <div className="voice-error">⚠️ {error}</div>
+          <div className="voice-text voice-text--error">
+            {error}
+          </div>
         )}
 
         {!isSupported && (
-          <div className="voice-error">⚠️ 浏览器不支持语音识别，请使用 Chrome</div>
+          <div className="voice-text voice-text--unsupported">
+            当前浏览器不支持语音识别，请使用 Chrome
+          </div>
         )}
       </div>
     </div>

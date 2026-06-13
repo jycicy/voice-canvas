@@ -7,7 +7,7 @@ interface DrawingCanvasProps {
   historyRef: React.MutableRefObject<CanvasHistory | null>;
 }
 
-export default function DrawingCanvas({ canvasRef, historyRef }: DrawingCanvasProps) {
+export function DrawingCanvas({ canvasRef, historyRef }: DrawingCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const htmlCanvasRef = useRef<HTMLCanvasElement>(null);
 

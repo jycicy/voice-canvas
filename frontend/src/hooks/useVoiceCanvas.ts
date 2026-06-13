@@ -38,6 +38,10 @@ interface VoiceCanvasState {
   startListening: () => void;
   stopListening: () => void;
   selectAlternative: (command: DrawCommand) => void;
+  /** 工具栏操作 */
+  executeAction: (action: string) => Promise<void>;
+  /** 文字输入提交 */
+  submitText: (text: string) => void;
 }
 
 export function useVoiceCanvas(
@@ -83,7 +87,6 @@ export function useVoiceCanvas(
 
       processingRef.current = true;
       setState('parsing');
-      speak('正在理解...');
 
       try {
         // 1. 调用后端解析（支持复合指令）
@@ -104,26 +107,36 @@ export function useVoiceCanvas(
         if (firstCommand.type === 'ai_generate' && firstCommand.prompt) {
           // AI 图像生成
           setState('generating');
+          setLastMessage('正在生成图片，请稍候...');
           speak(firstCommand.speak || '正在生成图片，请稍等');
 
-          const imageUrl = await generateImage(firstCommand.prompt, {
-            onCompleted: (data) => {
-              setLastMessage(data.message);
-            },
-            onError: (data) => {
-              setLastMessage(data.message);
-              speak(data.message);
-            },
-          });
+          let imageUrl = '';
+          try {
+            imageUrl = await generateImage(firstCommand.prompt, {
+              onCompleted: (data) => {
+                setLastMessage(data.message);
+              },
+              onError: (data) => {
+                setLastMessage(`生成失败: ${data.message}`);
+              },
+            });
+          } catch (genError: any) {
+            console.error('[VoiceCanvas] 图像生成失败:', genError);
+            const errorMsg = genError.message || '图像生成失败';
+            setLastMessage(errorMsg);
+            speak('图像生成失败，请稍后重试');
+            return;
+          }
 
           // 将图片加载到画布
           if (imageUrl && canvasRef.current) {
             try {
+              setLastMessage('正在加载图片到画布...');
               const img = await fabric.FabricImage.fromURL(imageUrl);
               const canvas = canvasRef.current;
               const scale = Math.min(
-                (canvas.getWidth() * 0.6) / img.width!,
-                (canvas.getHeight() * 0.6) / img.height!,
+                (canvas.getWidth() * 0.6) / (img.width || 1),
+                (canvas.getHeight() * 0.6) / (img.height || 1),
                 1,
               );
               img.scale(scale);
@@ -139,10 +152,14 @@ export function useVoiceCanvas(
               speak('图片已生成');
               setLastMessage('图片已添加到画布');
               saveCanvas();
-            } catch (e) {
+            } catch (loadError) {
+              console.error('[VoiceCanvas] 图片加载失败:', loadError);
               speak('图片加载失败');
-              setLastMessage('图片加载失败');
+              setLastMessage('图片加载失败，请重试');
             }
+          } else if (!imageUrl) {
+            setLastMessage('未获取到图片数据');
+            speak('图片生成失败');
           }
         } else {
           // 画布操作（支持复合指令批量执行）
@@ -175,7 +192,7 @@ export function useVoiceCanvas(
         console.error('[VoiceCanvas] 处理失败:', e);
         let msg = '处理失败，请重试';
         if (e.message?.includes('fetch') || e.message?.includes('network') || e.message?.includes('Failed')) {
-          msg = '网络连接失败，请检查后端服务';
+          msg = '网络连接失败，请检查后端服务是否启动';
         } else if (e.message?.includes('解析') || e.message?.includes('JSON')) {
           msg = '指令理解失败，请换个说法试试';
         } else if (e.message?.includes('生成') || e.message?.includes('image')) {
@@ -209,6 +226,41 @@ export function useVoiceCanvas(
     [canvasRef, speak, saveCanvas],
   );
 
+  // 直接执行命令（用于工具栏按钮和文字输入）
+  const executeAction = useCallback(
+    async (action: string) => {
+      if (!canvasRef.current) return;
+      const cmd: DrawCommand = { type: 'canvas_action', action: action as any };
+      if (action === 'undo') {
+        const ok = await historyRef.current?.undo();
+        const msg = ok ? '已撤销' : '没有可撤销的操作';
+        speak(msg);
+        setLastMessage(msg);
+      } else if (action === 'redo') {
+        const ok = await historyRef.current?.redo();
+        const msg = ok ? '已重做' : '没有可重做的操作';
+        speak(msg);
+        setLastMessage(msg);
+      } else {
+        const result = executeCommand(canvasRef.current, cmd);
+        speak(result.message);
+        setLastMessage(result.message);
+      }
+      saveCanvas();
+    },
+    [canvasRef, historyRef, speak, saveCanvas],
+  );
+
+  // 文字输入提交
+  const submitText = useCallback(
+    (text: string) => {
+      if (text.trim()) {
+        processText(text.trim());
+      }
+    },
+    [processText],
+  );
+
   // 监听语音识别的 finalText 变化
   useEffect(() => {
     if (speech.finalText && speech.finalText !== lastFinalRef.current) {
@@ -236,5 +288,7 @@ export function useVoiceCanvas(
     startListening: speech.start,
     stopListening: speech.stop,
     selectAlternative,
+    executeAction,
+    submitText,
   };
 }

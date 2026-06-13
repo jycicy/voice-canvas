@@ -24,9 +24,12 @@ def _load_prompt_template() -> str:
 
 def _get_client() -> AsyncOpenAI:
     """创建 LLM 客户端"""
+    api_key = os.getenv("LLM_API_KEY", "")
+    base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+    print(f"[command_parser] LLM 配置: base_url={base_url}, api_key={'*' * 8 if api_key else '未设置'}")
     return AsyncOpenAI(
-        api_key=os.getenv("LLM_API_KEY", ""),
-        base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+        api_key=api_key,
+        base_url=base_url,
     )
 
 
@@ -140,6 +143,7 @@ async def parse_command(text: str) -> DrawCommand:
 
     client = _get_client()
     model = os.getenv("LLM_MODEL", "mimo-v2.5-pro")
+    print(f"[command_parser] 使用模型: {model}")
 
     # 重试逻辑：最多 3 次，指数退避
     last_error = None
@@ -148,21 +152,57 @@ async def parse_command(text: str) -> DrawCommand:
             response = await client.chat.completions.create(
                 model=model,
                 messages=[
-                    {"role": "system", "content": "你是一个语音绘图指令解析器。只输出 JSON，不要输出其他内容。"},
+                    {"role": "system", "content": "你是一个语音绘图指令解析器。只输出 JSON，不要输出其他内容。不要思考，直接输出 JSON。"},
                     {"role": "user", "content": full_prompt},
                 ],
                 temperature=0.1,
-                max_tokens=1000,
+                max_tokens=4096,
             )
 
-            content = response.choices[0].message.content or ""
-            print(f"[command_parser] LLM 原始返回 (attempt {attempt + 1}): {content!r}")
+            # 详细日志
+            msg = response.choices[0].message
+            finish_reason = response.choices[0].finish_reason
+            content = msg.content or ""
+            reasoning = getattr(msg, 'reasoning_content', None) or ""
+
+            print(f"[command_parser] finish_reason: {finish_reason}")
+            print(f"[command_parser] content: {content!r}")
+            print(f"[command_parser] reasoning: {reasoning[:200]!r}...")
+
+            # 如果 content 为空但 reasoning 有内容，尝试从 reasoning 提取 JSON
+            if not content.strip() and reasoning:
+                print(f"[command_parser] content 为空，尝试从 reasoning 提取")
+                content = reasoning
 
             if not content.strip():
                 raise ValueError("LLM 返回空内容")
 
-            data = _extract_json(content)
-            return DrawCommand(**data)
+            # 检查 finish_reason
+            if finish_reason == "length":
+                print(f"[command_parser] 警告: 响应被截断 (finish_reason=length)")
+
+            # 尝试提取 JSON
+            if content.strip():
+                try:
+                    data = _extract_json(content)
+                    return DrawCommand(**data)
+                except Exception as json_err:
+                    print(f"[command_parser] JSON 解析失败: {json_err}")
+                    # 尝试修复截断的 JSON
+                    fixed = content.strip()
+                    if not fixed.endswith('}'):
+                        if '"speak"' not in fixed:
+                            fixed += ', "speak": "正在执行"'
+                        if '"confidence"' not in fixed:
+                            fixed += ', "confidence": 0.8'
+                        fixed += '}'
+                    try:
+                        data = _extract_json(fixed)
+                        return DrawCommand(**data)
+                    except:
+                        raise ValueError(f"无法解析 JSON: {content!r}")
+            else:
+                raise ValueError("LLM 返回空内容")
 
         except Exception as e:
             last_error = e

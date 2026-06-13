@@ -33,35 +33,70 @@ async def generate_image(prompt: str) -> dict:
     """
     cfg = _get_config()
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        response = await client.post(
-            cfg["api_url"],
-            headers={
-                "Authorization": f"Bearer {cfg['api_key']}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": cfg["model"],
-                "prompt": prompt,
-                "size": cfg["size"],
-                "response_format": "b64_json",
-            },
-        )
+    if not cfg["api_key"]:
+        raise ValueError("IMAGE_API_KEY 未配置，请在 .env 文件中设置")
 
-        response.raise_for_status()
-        data = response.json()
+    print(f"[image_generator] 开始生成: prompt={prompt!r}, model={cfg['model']}, size={cfg['size']}")
 
-        # 兼容 OpenAI 格式响应：{"data": [{"b64_json": "..."}]} 或 {"data": [{"url": "..."}]}
-        item = data["data"][0]
-        b64 = item.get("b64_json", "")
-        url = item.get("url", "")
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                cfg["api_url"],
+                headers={
+                    "Authorization": f"Bearer {cfg['api_key']}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": cfg["model"],
+                    "prompt": prompt,
+                    "size": cfg["size"],
+                },
+            )
 
-        if b64:
-            image_url = f"data:image/png;base64,{b64}"
-        else:
-            image_url = url
+            print(f"[image_generator] API 响应状态: {response.status_code}")
 
-        return {
-            "url": image_url,
-            "revised_prompt": prompt,
-        }
+            if response.status_code != 200:
+                error_text = response.text[:500]
+                print(f"[image_generator] API 错误: {error_text}")
+                raise Exception(f"图像生成 API 返回 {response.status_code}: {error_text}")
+
+            data = response.json()
+
+            # 兼容 OpenAI 格式响应：{"data": [{"b64_json": "..."}]} 或 {"data": [{"url": "..."}]}
+            if "data" not in data or not data["data"]:
+                raise Exception(f"API 响应格式错误: {str(data)[:200]}")
+
+            item = data["data"][0]
+            b64 = item.get("b64_json", "")
+            url = item.get("url", "")
+
+            if b64:
+                image_url = f"data:image/png;base64,{b64}"
+                print(f"[image_generator] 成功: base64 图片 ({len(b64)} 字符)")
+            elif url:
+                # 下载图片并转为 base64（避免前端 CORS 问题）
+                print(f"[image_generator] 下载图片: {url[:100]}")
+                img_resp = await client.get(url)
+                if img_resp.status_code == 200:
+                    import base64
+                    b64_data = base64.b64encode(img_resp.content).decode()
+                    image_url = f"data:image/png;base64,{b64_data}"
+                    print(f"[image_generator] 成功: 下载并转为 base64 ({len(b64_data)} 字符)")
+                else:
+                    # 下载失败，直接返回 URL（前端可能能访问）
+                    image_url = url
+                    print(f"[image_generator] 图片下载失败，使用原始 URL")
+            else:
+                raise Exception(f"API 响应中没有图片数据: {str(item)[:200]}")
+
+            return {
+                "url": image_url,
+                "revised_prompt": prompt,
+            }
+
+    except httpx.TimeoutException:
+        print(f"[image_generator] 请求超时")
+        raise Exception("图像生成超时，请稍后重试")
+    except httpx.ConnectError:
+        print(f"[image_generator] 连接失败")
+        raise Exception("无法连接到图像生成服务，请检查网络")

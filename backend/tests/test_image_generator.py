@@ -62,7 +62,7 @@ class TestGenerateImage:
 
     @pytest.mark.asyncio
     async def test_url_response(self):
-        """API 返回 URL 格式"""
+        """API 返回 URL 格式（下载并转 base64）"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -70,6 +70,11 @@ class TestGenerateImage:
         }
         mock_response.raise_for_status = MagicMock()
 
+        # 模拟图片下载响应
+        mock_img_response = MagicMock()
+        mock_img_response.status_code = 200
+        mock_img_response.content = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100  # 模拟 PNG 数据
+
         with patch("services.image_generator._get_config") as mock_cfg:
             mock_cfg.return_value = {
                 "api_url": "https://test.api/v1/images/generations",
@@ -78,15 +83,17 @@ class TestGenerateImage:
                 "size": "1024x768",
             }
             with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response):
-                result = await generate_image("a dog")
+                with patch("httpx.AsyncClient.get", new_callable=AsyncMock, return_value=mock_img_response):
+                    result = await generate_image("a dog")
 
-        assert result["url"] == "https://cdn.example.com/image.png"
+        assert result["url"].startswith("data:image/png;base64,")
 
     @pytest.mark.asyncio
     async def test_api_error(self):
         """API 调用失败抛异常"""
         mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = Exception("API Error")
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
 
         with patch("services.image_generator._get_config") as mock_cfg:
             mock_cfg.return_value = {
@@ -96,5 +103,5 @@ class TestGenerateImage:
                 "size": "1024x768",
             }
             with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response):
-                with pytest.raises(Exception, match="API Error"):
+                with pytest.raises(Exception, match="图像生成 API 返回 500"):
                     await generate_image("fail")
