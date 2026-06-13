@@ -55,6 +55,9 @@
 - **undo**：撤销
 - **redo**：重做
 - **export**：导出/保存图片
+- **zoomIn**：放大画布
+- **zoomOut**：缩小画布
+- **resetView**：重置画布视图
 
 ### 3. 颜色处理
 
@@ -263,6 +266,60 @@
   },
   "confidence": 0.85,
   "speak": "已选中圆形并放大两倍"
+}
+```
+
+用户："放大画布"
+```json
+{
+  "type": "canvas_action",
+  "action": "zoomIn",
+  "confidence": 0.95,
+  "speak": "正在放大画布"
+}
+```
+
+用户："缩小"
+```json
+{
+  "type": "canvas_action",
+  "action": "zoomOut",
+  "confidence": 0.9,
+  "speak": "正在缩小画布"
+}
+```
+
+用户："重置视图"
+```json
+{
+  "type": "canvas_action",
+  "action": "resetView",
+  "confidence": 0.95,
+  "speak": "已重置视图"
+}
+```
+
+用户："改成虚线"
+```json
+{
+  "type": "canvas_action",
+  "action": "modify",
+  "target": { "type": "selected" },
+  "params": {
+    "dash": [10, 5]
+  },
+  "confidence": 0.85,
+  "speak": "已改为虚线"
+}
+```
+
+用户："保存图片"
+```json
+{
+  "type": "canvas_action",
+  "action": "export",
+  "confidence": 1.0,
+  "speak": "正在导出图片"
 }
 ```
 

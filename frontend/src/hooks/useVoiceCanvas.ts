@@ -7,7 +7,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import * as fabric from 'fabric';
 import { useSpeechRecognition } from './useSpeechRecognition';
-import { parseCommand, generateImage } from '../lib/api';
+import { parseCompoundCommand, generateImage } from '../lib/api';
 import { executeCommand } from '../lib/canvasExecutor';
 import type { DrawCommand } from '../lib/canvasExecutor';
 import { CanvasHistory } from '../lib/canvasHistory';
@@ -65,17 +65,18 @@ export function useVoiceCanvas(
       speak('正在理解...');
 
       try {
-        // 1. 调用后端解析
-        const { command } = await parseCommand(text);
-        setLastCommand(command);
+        // 1. 调用后端解析（支持复合指令）
+        const { commands } = await parseCompoundCommand(text);
+        const firstCommand = commands[0];
+        setLastCommand(firstCommand);
 
         // 2. 根据命令类型分发
-        if (command.type === 'ai_generate' && command.prompt) {
+        if (firstCommand.type === 'ai_generate' && firstCommand.prompt) {
           // AI 图像生成
           setState('generating');
-          speak(command.speak || '正在生成图片，请稍等');
+          speak(firstCommand.speak || '正在生成图片，请稍等');
 
-          const imageUrl = await generateImage(command.prompt, {
+          const imageUrl = await generateImage(firstCommand.prompt, {
             onCompleted: (data) => {
               setLastMessage(data.message);
             },
@@ -113,22 +114,29 @@ export function useVoiceCanvas(
             }
           }
         } else {
-          // 画布操作
+          // 画布操作（支持复合指令批量执行）
           setState('executing');
-          const result = executeCommand(canvasRef.current, command);
+          let lastResult;
 
-          // 撤销/重做需要调用 history
-          if (command.action === 'undo') {
-            const ok = await historyRef.current?.undo();
-            speak(ok ? '已撤销' : '没有可撤销的操作');
-            setLastMessage(ok ? '已撤销' : '没有可撤销的操作');
-          } else if (command.action === 'redo') {
-            const ok = await historyRef.current?.redo();
-            speak(ok ? '已重做' : '没有可重做的操作');
-            setLastMessage(ok ? '已重做' : '没有可重做的操作');
-          } else {
-            speak(result.message);
-            setLastMessage(result.message);
+          for (const cmd of commands) {
+            // 撤销/重做需要调用 history
+            if (cmd.action === 'undo') {
+              const ok = await historyRef.current?.undo();
+              lastResult = { success: !!ok, message: ok ? '已撤销' : '没有可撤销的操作' };
+            } else if (cmd.action === 'redo') {
+              const ok = await historyRef.current?.redo();
+              lastResult = { success: !!ok, message: ok ? '已重做' : '没有可重做的操作' };
+            } else {
+              lastResult = executeCommand(canvasRef.current!, cmd);
+            }
+          }
+
+          if (lastResult) {
+            const msg = commands.length > 1
+              ? `已执行 ${commands.length} 个操作`
+              : lastResult.message;
+            speak(msg);
+            setLastMessage(msg);
           }
         }
       } catch (e: any) {

@@ -28,6 +28,9 @@ class CanvasAction(str, Enum):
     UNDO = "undo"
     REDO = "redo"
     EXPORT = "export"
+    ZOOM_IN = "zoomIn"
+    ZOOM_OUT = "zoomOut"
+    RESET_VIEW = "resetView"
 
 
 class ShapeType(str, Enum):
@@ -72,6 +75,8 @@ class DrawParams(BaseModel):
     scale_x: Optional[float] = Field(None, alias="scaleX", description="X 缩放")
     scale_y: Optional[float] = Field(None, alias="scaleY", description="Y 缩放")
     opacity: Optional[float] = Field(None, description="透明度 0-1")
+    dash: Optional[list[float]] = Field(None, description="虚线样式 [线长, 间距]")
+    line_height: Optional[float] = Field(None, alias="lineHeight", description="行高")
 
     model_config = {"populate_by_name": True}
 

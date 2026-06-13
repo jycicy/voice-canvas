@@ -156,12 +156,53 @@ async def parse_command(text: str) -> DrawCommand:
         print(f"[command_parser] LLM 原始返回: {content!r}")
         data = _extract_json(content)
 
-        # 修正 action 字段为枚举值
-        if "action" in data and isinstance(data["action"], str):
-            pass  # Pydantic 会自动处理字符串到枚举的转换
-
         return DrawCommand(**data)
 
     except Exception as e:
         print(f"[command_parser] LLM 解析失败: {e}")
         return _build_fallback_command(text)
+
+
+async def parse_compound_command(text: str) -> list[DrawCommand]:
+    """解析复合指令，返回多个命令
+
+    例如 "画三个红色圆形排成一排" → 3 个 draw 命令
+    """
+    # 检测是否包含数量关键词
+    count_match = re.search(r"([一二三四五六七八九十\d]+)\s*个", text)
+    if not count_match:
+        # 非复合指令，返回单个命令
+        cmd = await parse_command(text)
+        return [cmd]
+
+    # 中文数字映射
+    cn_num = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+    count_str = count_match.group(1)
+    count = cn_num.get(count_str, int(count_str) if count_str.isdigit() else 1)
+
+    # 限制最多 10 个，避免语音误识别
+    count = min(count, 10)
+
+    # 解析单个命令的语义
+    single_text = re.sub(r"[一二三四五六七八九十\d]+\s*个", "一个", text)
+    cmd = await parse_command(single_text)
+
+    # 如果解析失败或不是 draw 类型，直接返回单个命令
+    if cmd.type != CommandType.CANVAS_ACTION or cmd.action != "draw":
+        return [cmd]
+
+    # 根据数量生成多个命令，水平排列
+    commands = []
+    spacing = 150  # 对象间距
+    total_width = (count - 1) * spacing
+    start_x = -total_width / 2
+
+    for i in range(count):
+        import copy
+        new_cmd = copy.deepcopy(cmd)
+        if new_cmd.params:
+            new_cmd.params.left = start_x + i * spacing
+        new_cmd.speak = f"正在绘制第 {i + 1} 个"
+        commands.append(new_cmd)
+
+    return commands
