@@ -66,7 +66,7 @@ function App() {
           onStop={voice.stopListening}
         />
         <div className="voice-hint">
-          点击 🎤 按钮开始语音指令 · 试试说"画一个红色圆形"
+          点击 🎤 开始 · 试试说 "画一个红色圆形" "画一只猫" "清空画布"
         </div>
       </footer>
     </div>

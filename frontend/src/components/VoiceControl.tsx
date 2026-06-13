@@ -1,7 +1,7 @@
 /**
  * 语音控制面板
  *
- * 提供语音按钮、实时识别文字展示、状态指示。
+ * 提供语音按钮、实时识别文字展示、状态指示、波形动画。
  */
 
 import type { ProcessingState } from '../hooks/useVoiceCanvas';
@@ -19,7 +19,7 @@ interface VoiceControlProps {
 
 /** 状态对应的中文文案 */
 const STATE_LABELS: Record<ProcessingState, string> = {
-  idle: '空闲',
+  idle: '等待指令',
   listening: '正在聆听...',
   parsing: '正在理解...',
   executing: '正在执行...',
@@ -55,7 +55,13 @@ export default function VoiceControl({
         disabled={!isSupported || state === 'generating'}
         title={isSupported ? '点击开始/停止语音' : '浏览器不支持语音识别'}
       >
-        {isListening ? '🔴' : '🎤'}
+        <span className="voice-btn-icon">{isListening ? '🔴' : '🎤'}</span>
+        {/* 录音波形动画 */}
+        {isListening && (
+          <div className="voice-waves">
+            <span className="wave" /><span className="wave" /><span className="wave" />
+          </div>
+        )}
       </button>
 
       {/* 状态与识别文字 */}
@@ -78,6 +84,10 @@ export default function VoiceControl({
 
         {error && (
           <div className="voice-error">⚠️ {error}</div>
+        )}
+
+        {!isSupported && (
+          <div className="voice-error">⚠️ 浏览器不支持语音识别，请使用 Chrome</div>
         )}
       </div>
     </div>
