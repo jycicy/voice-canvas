@@ -25,8 +25,8 @@ html, body, #root {
   align-items: center;
   justify-content: space-between;
   padding: 8px 20px;
-  background: #16213e;
-  border-bottom: 1px solid #1a1a3e;
+  background: linear-gradient(135deg, #16213e 0%, #1a1a3e 100%);
+  border-bottom: 1px solid #1a3a5c;
   height: 50px;
   flex-shrink: 0;
 }
@@ -55,8 +55,8 @@ html, body, #root {
 
 /* 底部语音控制区 */
 .voice-footer {
-  background: #16213e;
-  border-top: 1px solid #1a1a3e;
+  background: linear-gradient(135deg, #1a1a3e 0%, #16213e 100%);
+  border-top: 1px solid #1a3a5c;
   padding: 12px 20px;
   flex-shrink: 0;
 }
@@ -78,8 +78,8 @@ html, body, #root {
 }
 
 .voice-btn {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: 2px solid #334;
   background: #1a1a3e;
@@ -90,6 +90,46 @@ html, body, #root {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
+}
+
+.voice-btn-icon {
+  z-index: 1;
+}
+
+/* 录音波形动画 */
+.voice-waves {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.wave {
+  width: 3px;
+  height: 12px;
+  background: #ff4444;
+  border-radius: 2px;
+  animation: waveAnim 0.6s ease-in-out infinite alternate;
+}
+
+.wave:nth-child(2) {
+  animation-delay: 0.2s;
+  height: 18px;
+}
+
+.wave:nth-child(3) {
+  animation-delay: 0.4s;
+  height: 10px;
+}
+
+@keyframes waveAnim {
+  0% { transform: scaleY(0.5); opacity: 0.5; }
+  100% { transform: scaleY(1.2); opacity: 1; }
 }
 
 .voice-btn:hover {
