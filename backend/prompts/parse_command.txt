@@ -45,9 +45,12 @@
 ### 2. canvas_action 的 action 类型
 
 - **draw**：画新图形
-- **modify**：修改已有对象的属性（颜色、大小、位置等）
+- **modify**：修改已有对象的属性（颜色、透明度等）
+- **move**：移动选中对象（left/top 为偏移量，正值向右/下，负值向左/上）
+- **scale**：缩放选中对象（scaleX/scaleY 为倍数，如 2 表示放大两倍，0.5 表示缩小一半）
+- **rotate**：旋转选中对象（angle 为旋转角度，正值顺时针）
 - **delete**：删除对象
-- **select**：选中对象
+- **select**：选中对象（type: "last" 选最后绘制的，"all" 全选，或按 filter 筛选）
 - **clear**：清空画布
 - **undo**：撤销
 - **redo**：重做
@@ -175,6 +178,91 @@
   },
   "confidence": 0.95,
   "speak": "正在添加文字：你好世界"
+}
+```
+
+用户："选中圆形"
+```json
+{
+  "type": "canvas_action",
+  "action": "select",
+  "target": {
+    "type": "circle"
+  },
+  "confidence": 0.9,
+  "speak": "已选中圆形"
+}
+```
+
+用户："选中红色的图形"
+```json
+{
+  "type": "canvas_action",
+  "action": "select",
+  "target": {
+    "type": "selected",
+    "filter": { "color": "#FF0000" }
+  },
+  "confidence": 0.85,
+  "speak": "已选中红色图形"
+}
+```
+
+用户："放大两倍"
+```json
+{
+  "type": "canvas_action",
+  "action": "scale",
+  "params": {
+    "scaleX": 2,
+    "scaleY": 2
+  },
+  "confidence": 0.9,
+  "speak": "已放大两倍"
+}
+```
+
+用户："旋转45度"
+```json
+{
+  "type": "canvas_action",
+  "action": "rotate",
+  "params": {
+    "angle": 45
+  },
+  "confidence": 0.9,
+  "speak": "已旋转45度"
+}
+```
+
+用户："向上移动50"
+```json
+{
+  "type": "canvas_action",
+  "action": "move",
+  "params": {
+    "left": 0,
+    "top": -50
+  },
+  "confidence": 0.9,
+  "speak": "已向上移动"
+}
+```
+
+用户："选中圆形放大两倍"
+```json
+{
+  "type": "canvas_action",
+  "action": "select",
+  "target": {
+    "type": "circle"
+  },
+  "params": {
+    "scaleX": 2,
+    "scaleY": 2
+  },
+  "confidence": 0.85,
+  "speak": "已选中圆形并放大两倍"
 }
 ```
 

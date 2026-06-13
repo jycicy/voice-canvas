@@ -19,6 +19,9 @@ class CanvasAction(str, Enum):
     """画布操作类型"""
     DRAW = "draw"
     MODIFY = "modify"
+    MOVE = "move"
+    SCALE = "scale"
+    ROTATE = "rotate"
     DELETE = "delete"
     SELECT = "select"
     CLEAR = "clear"
@@ -37,6 +40,7 @@ class ShapeType(str, Enum):
     POLYGON = "polygon"
     IMAGE = "image"
     SELECTED = "selected"
+    LAST = "last"
     ALL = "all"
 
 
