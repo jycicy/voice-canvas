@@ -41,6 +41,7 @@ export interface DrawCommand {
   prompt?: string;
   confidence?: number;
   speak?: string;
+  alternatives?: { label: string; command: DrawCommand }[];
 }
 
 /** 命令执行结果 */

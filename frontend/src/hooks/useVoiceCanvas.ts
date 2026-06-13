@@ -14,6 +14,11 @@ import { CanvasHistory } from '../lib/canvasHistory';
 
 export type ProcessingState = 'idle' | 'listening' | 'parsing' | 'executing' | 'generating';
 
+interface Alternative {
+  label: string;
+  command: DrawCommand;
+}
+
 interface VoiceCanvasState {
   /** 当前处理状态 */
   state: ProcessingState;
@@ -27,9 +32,12 @@ interface VoiceCanvasState {
   isListening: boolean;
   isSupported: boolean;
   error: string | null;
+  /** 建议指令列表 */
+  alternatives: Alternative[];
   /** 控制方法 */
   startListening: () => void;
   stopListening: () => void;
+  selectAlternative: (command: DrawCommand) => void;
 }
 
 export function useVoiceCanvas(
@@ -39,6 +47,7 @@ export function useVoiceCanvas(
   const [state, setState] = useState<ProcessingState>('idle');
   const [lastCommand, setLastCommand] = useState<DrawCommand | null>(null);
   const [lastMessage, setLastMessage] = useState('');
+  const [alternatives, setAlternatives] = useState<Alternative[]>([]);
 
   const speech = useSpeechRecognition();
   const processingRef = useRef(false);
@@ -69,6 +78,15 @@ export function useVoiceCanvas(
         const { commands } = await parseCompoundCommand(text);
         const firstCommand = commands[0];
         setLastCommand(firstCommand);
+        setAlternatives(firstCommand.alternatives || []);
+
+        // 低置信度时展示建议列表
+        if ((firstCommand.confidence ?? 1) < 0.7 && (firstCommand.alternatives?.length ?? 0) > 0) {
+          speak('您是否想说' + (firstCommand.alternatives![0]?.label || ''));
+          setState('idle');
+          processingRef.current = false;
+          return;
+        }
 
         // 2. 根据命令类型分发
         if (firstCommand.type === 'ai_generate' && firstCommand.prompt) {
@@ -141,7 +159,14 @@ export function useVoiceCanvas(
         }
       } catch (e: any) {
         console.error('[VoiceCanvas] 处理失败:', e);
-        const msg = '处理失败，请重试';
+        let msg = '处理失败，请重试';
+        if (e.message?.includes('fetch') || e.message?.includes('network') || e.message?.includes('Failed')) {
+          msg = '网络连接失败，请检查后端服务';
+        } else if (e.message?.includes('解析') || e.message?.includes('JSON')) {
+          msg = '指令理解失败，请换个说法试试';
+        } else if (e.message?.includes('生成') || e.message?.includes('image')) {
+          msg = '图片生成失败，请稍后重试';
+        }
         speak(msg);
         setLastMessage(msg);
       } finally {
@@ -150,6 +175,23 @@ export function useVoiceCanvas(
       }
     },
     [canvasRef, historyRef, speak],
+  );
+
+  // 选择建议指令
+  const selectAlternative = useCallback(
+    (command: DrawCommand) => {
+      setAlternatives([]);
+      if (canvasRef.current) {
+        processingRef.current = true;
+        setState('executing');
+        const result = executeCommand(canvasRef.current, command);
+        speak(result.message);
+        setLastMessage(result.message);
+        processingRef.current = false;
+        setState('idle');
+      }
+    },
+    [canvasRef, speak],
   );
 
   // 监听语音识别的 finalText 变化
@@ -175,7 +217,9 @@ export function useVoiceCanvas(
     isListening: speech.isListening,
     isSupported: speech.isSupported,
     error: speech.error,
+    alternatives,
     startListening: speech.start,
     stopListening: speech.stop,
+    selectAlternative,
   };
 }

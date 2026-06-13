@@ -141,26 +141,38 @@ async def parse_command(text: str) -> DrawCommand:
     client = _get_client()
     model = os.getenv("LLM_MODEL", "mimo-v2.5-pro")
 
-    try:
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "你是一个语音绘图指令解析器。只输出 JSON，不要输出其他内容。"},
-                {"role": "user", "content": full_prompt},
-            ],
-            temperature=0.1,
-            max_tokens=1000,
-        )
+    # 重试逻辑：最多 3 次，指数退避
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "你是一个语音绘图指令解析器。只输出 JSON，不要输出其他内容。"},
+                    {"role": "user", "content": full_prompt},
+                ],
+                temperature=0.1,
+                max_tokens=1000,
+            )
 
-        content = response.choices[0].message.content or ""
-        print(f"[command_parser] LLM 原始返回: {content!r}")
-        data = _extract_json(content)
+            content = response.choices[0].message.content or ""
+            print(f"[command_parser] LLM 原始返回 (attempt {attempt + 1}): {content!r}")
 
-        return DrawCommand(**data)
+            if not content.strip():
+                raise ValueError("LLM 返回空内容")
 
-    except Exception as e:
-        print(f"[command_parser] LLM 解析失败: {e}")
-        return _build_fallback_command(text)
+            data = _extract_json(content)
+            return DrawCommand(**data)
+
+        except Exception as e:
+            last_error = e
+            print(f"[command_parser] 第 {attempt + 1} 次解析失败: {e}")
+            if attempt < 2:
+                import asyncio
+                await asyncio.sleep(0.5 * (2 ** attempt))  # 指数退避: 0.5s, 1s
+
+    print(f"[command_parser] 3 次重试均失败，使用兜底: {last_error}")
+    return _build_fallback_command(text)
 
 
 async def parse_compound_command(text: str) -> list[DrawCommand]:
