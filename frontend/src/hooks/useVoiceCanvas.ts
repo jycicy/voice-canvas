@@ -5,7 +5,6 @@
  */
 
 import { useRef, useCallback, useEffect, useState } from 'react';
-import * as fabric from 'fabric';
 import { useSpeechRecognition } from './useSpeechRecognition';
 import { parseCompoundCommand, saveCanvasState, getSessionId } from '../lib/api';
 import { executeCommand, executeCode } from '../lib/canvasExecutor';
@@ -27,34 +26,52 @@ export interface ChatMessage {
 }
 
 interface VoiceCanvasState {
-  /** 当前处理状态 */
   state: ProcessingState;
-  /** 最近识别的文本 */
   recognizedText: string;
-  /** 最近执行的命令 */
   lastCommand: DrawCommand | null;
-  /** 最近的反馈消息 */
   lastMessage: string;
-  /** 语音识别结果 */
   isListening: boolean;
   isSupported: boolean;
   error: string | null;
-  /** 建议指令列表 */
   alternatives: Alternative[];
-  /** 聊天消息列表 */
   messages: ChatMessage[];
-  /** 控制方法 */
   startListening: () => void;
   stopListening: () => void;
   selectAlternative: (command: DrawCommand) => void;
-  /** 工具栏操作 */
   executeAction: (action: string) => Promise<void>;
-  /** 文字输入提交 */
   submitText: (text: string) => void;
 }
 
+/** 匹配语音选择建议的指令 */
+function matchAlternativeSelection(text: string, alternatives: Alternative[]): Alternative | null {
+  const t = text.trim();
+
+  // 数字匹配："1", "2", "3" 或 "第一个", "第二个", "第三个"
+  const numMap: Record<string, number> = {
+    '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+    '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
+  };
+
+  // "第一个", "选项2", "选1", "选第一个"
+  const match = t.match(/(?:选|选项|第)?([一二三四五12345])(?:个|号)?/);
+  if (match) {
+    const idx = numMap[match[1]];
+    if (idx && idx <= alternatives.length) {
+      return alternatives[idx - 1];
+    }
+  }
+
+  // "确认", "确定" → 选第一个
+  if (/^(确认|确定|好的?|ok|yes)$/i.test(t)) {
+    return alternatives[0];
+  }
+
+  return null;
+}
+
 export function useVoiceCanvas(
-  canvasRef: React.MutableRefObject<fabric.Canvas | null>,
+  canvasRef: React.MutableRefObject<HTMLCanvasElement | null>,
+  ctxRef: React.MutableRefObject<CanvasRenderingContext2D | null>,
   historyRef: React.MutableRefObject<CanvasHistory | null>,
 ): VoiceCanvasState {
   const [state, setState] = useState<ProcessingState>('idle');
@@ -66,16 +83,19 @@ export function useVoiceCanvas(
   const speech = useSpeechRecognition();
   const processingRef = useRef(false);
   const lastFinalRef = useRef('');
+  // 当前是否有待选择的建议
+  const pendingAlternativesRef = useRef<Alternative[]>([]);
 
   // 保存画布状态到后端（防抖）
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const saveCanvas = useCallback(() => {
-    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      const json = canvasRef.current!.toJSON();
+      const dataUrl = canvas.toDataURL('image/png');
       const sessionId = getSessionId();
-      saveCanvasState(sessionId, json);
+      saveCanvasState(sessionId, { dataUrl });
     }, 500);
   }, [canvasRef]);
 
@@ -93,7 +113,50 @@ export function useVoiceCanvas(
   const processText = useCallback(
     async (text: string) => {
       if (!text.trim() || processingRef.current) return;
-      if (!canvasRef.current) return;
+      const canvas = canvasRef.current;
+      const ctx = ctxRef.current;
+      if (!canvas || !ctx) return;
+
+      // 如果有待选建议，先检查是否是选择指令
+      if (pendingAlternativesRef.current.length > 0) {
+        const selected = matchAlternativeSelection(text, pendingAlternativesRef.current);
+        if (selected) {
+          const alts = pendingAlternativesRef.current;
+          pendingAlternativesRef.current = [];
+          setAlternatives([]);
+          // 添加用户消息
+          setMessages((prev) => [...prev, {
+            id: Date.now().toString(),
+            role: 'user',
+            text,
+            time: new Date(),
+          }]);
+          // 直接执行选中的建议
+          const canvas = canvasRef.current;
+          const ctx = ctxRef.current;
+          if (canvas && ctx) {
+            processingRef.current = true;
+            setState('executing');
+            if (selected.type === 'code_execute' && selected.code) {
+              const result = executeCode(ctx, canvas.width, canvas.height, selected.code);
+              speak(result.message);
+              setLastMessage(result.message);
+            } else {
+              const result = executeCommand(canvas, ctx, selected);
+              speak(result.message);
+              setLastMessage(result.message);
+            }
+            processingRef.current = false;
+            setState('idle');
+            historyRef.current?.save();
+            saveCanvas();
+          }
+          return;
+        }
+        // 不是选择指令，清空待选状态，继续正常解析
+        pendingAlternativesRef.current = [];
+        setAlternatives([]);
+      }
 
       processingRef.current = true;
       setState('parsing');
@@ -108,7 +171,6 @@ export function useVoiceCanvas(
       setMessages((prev) => [...prev, userMsg]);
 
       try {
-        // 1. 调用后端解析（支持复合指令）
         const { commands } = await parseCompoundCommand(text);
         const firstCommand = commands[0];
         setLastCommand(firstCommand);
@@ -116,23 +178,25 @@ export function useVoiceCanvas(
 
         // 低置信度时展示建议列表
         if ((firstCommand.confidence ?? 1) < 0.7 && (firstCommand.alternatives?.length ?? 0) > 0) {
-          speak('您是否想说' + (firstCommand.alternatives![0]?.label || ''));
+          const alts = firstCommand.alternatives!;
+          // 语音播报编号选项
+          const optionText = alts.map((a, i) => `${i + 1}、${a.label}`).join('，');
+          speak(`您是否想说：${optionText}，请说编号选择`);
+          pendingAlternativesRef.current = alts;
           setState('idle');
           processingRef.current = false;
           return;
         }
 
-        // 2. 根据命令类型分发
         if (firstCommand.type === 'code_execute' && firstCommand.code) {
-          // LLM 生成代码 → 沙箱执行
+          // Canvas 2D 代码绘图
           setState('executing');
           setLastMessage('正在执行绘图代码...');
           speak(firstCommand.speak || '正在绘制');
 
-          const result = executeCode(canvasRef.current, firstCommand.code);
+          const result = executeCode(ctx, canvas.width, canvas.height, firstCommand.code);
           speak(result.message);
           setLastMessage(result.message);
-          // 添加系统消息
           setMessages((prev) => [...prev, {
             id: (Date.now() + 1).toString(),
             role: 'system',
@@ -140,15 +204,15 @@ export function useVoiceCanvas(
             time: new Date(),
           }]);
           if (result.success) {
+            historyRef.current?.save();
             saveCanvas();
           }
         } else {
-          // 画布操作（支持复合指令批量执行）
+          // 画布操作
           setState('executing');
           let lastResult;
 
           for (const cmd of commands) {
-            // 撤销/重做需要调用 history
             if (cmd.action === 'undo') {
               const ok = await historyRef.current?.undo();
               lastResult = { success: !!ok, message: ok ? '已撤销' : '没有可撤销的操作' };
@@ -156,7 +220,7 @@ export function useVoiceCanvas(
               const ok = await historyRef.current?.redo();
               lastResult = { success: !!ok, message: ok ? '已重做' : '没有可重做的操作' };
             } else {
-              lastResult = executeCommand(canvasRef.current!, cmd);
+              lastResult = executeCommand(canvas, ctx, cmd);
             }
           }
 
@@ -172,17 +236,19 @@ export function useVoiceCanvas(
               text: msg,
               time: new Date(),
             }]);
+            historyRef.current?.save();
             saveCanvas();
           }
         }
-      } catch (e: any) {
-        console.error('[VoiceCanvas] 处理失败:', e);
+      } catch (e: unknown) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        console.error('[VoiceCanvas] 处理失败:', err);
         let msg = '处理失败，请重试';
-        if (e.message?.includes('fetch') || e.message?.includes('network') || e.message?.includes('Failed')) {
+        if (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed')) {
           msg = '网络连接失败，请检查后端服务是否启动';
-        } else if (e.message?.includes('解析') || e.message?.includes('JSON')) {
+        } else if (err.message.includes('解析') || err.message.includes('JSON')) {
           msg = '指令理解失败，请换个说法试试';
-        } else if (e.message?.includes('代码') || e.message?.includes('code')) {
+        } else if (err.message.includes('代码') || err.message.includes('code')) {
           msg = '绘图代码执行失败，请换个说法试试';
         }
         speak(msg);
@@ -198,32 +264,48 @@ export function useVoiceCanvas(
         setState('idle');
       }
     },
-    [canvasRef, historyRef, speak],
+    [canvasRef, ctxRef, historyRef, speak, saveCanvas],
   );
 
-  // 选择建议指令
+  // 选择建议指令（鼠标点击）
   const selectAlternative = useCallback(
     (command: DrawCommand) => {
+      pendingAlternativesRef.current = [];
       setAlternatives([]);
-      if (canvasRef.current) {
-        processingRef.current = true;
-        setState('executing');
-        const result = executeCommand(canvasRef.current, command);
+      const canvas = canvasRef.current;
+      const ctx = ctxRef.current;
+      if (!canvas || !ctx) return;
+
+      processingRef.current = true;
+      setState('executing');
+
+      if (command.type === 'code_execute' && command.code) {
+        const result = executeCode(ctx, canvas.width, canvas.height, command.code);
         speak(result.message);
         setLastMessage(result.message);
-        processingRef.current = false;
-        setState('idle');
-        saveCanvas();
+      } else {
+        const result = executeCommand(canvas, ctx, command);
+        speak(result.message);
+        setLastMessage(result.message);
       }
+
+      processingRef.current = false;
+      setState('idle');
+      historyRef.current?.save();
+      saveCanvas();
     },
-    [canvasRef, speak, saveCanvas],
+    [canvasRef, ctxRef, historyRef, speak, saveCanvas],
   );
 
-  // 直接执行命令（用于工具栏按钮和文字输入）
+  // 直接执行操作（工具栏按钮）
   const executeAction = useCallback(
     async (action: string) => {
-      if (!canvasRef.current) return;
-      const cmd: DrawCommand = { type: 'canvas_action', action: action as any };
+      const canvas = canvasRef.current;
+      const ctx = ctxRef.current;
+      if (!canvas || !ctx) return;
+
+      const cmd: DrawCommand = { type: 'canvas_action', action: action as DrawCommand['action'] };
+
       if (action === 'undo') {
         const ok = await historyRef.current?.undo();
         const msg = ok ? '已撤销' : '没有可撤销的操作';
@@ -235,13 +317,14 @@ export function useVoiceCanvas(
         speak(msg);
         setLastMessage(msg);
       } else {
-        const result = executeCommand(canvasRef.current, cmd);
+        const result = executeCommand(canvas, ctx, cmd);
         speak(result.message);
         setLastMessage(result.message);
       }
+      historyRef.current?.save();
       saveCanvas();
     },
-    [canvasRef, historyRef, speak, saveCanvas],
+    [canvasRef, ctxRef, historyRef, speak, saveCanvas],
   );
 
   // 文字输入提交

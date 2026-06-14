@@ -1,56 +1,44 @@
 /**
- * 画布历史管理
+ * 画布历史管理 — 快照式撤销/重做
  *
- * 维护撤销/重做状态栈，支持最多 50 步历史。
+ * 用 canvas.toDataURL() 保存快照，支持原生 Canvas 2D 绘图。
  */
 
-import * as fabric from 'fabric';
-
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 30;
 
 export class CanvasHistory {
-  private canvas: fabric.Canvas;
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
   private undoStack: string[] = [];
   private redoStack: string[] = [];
   private locked = false;
 
-  constructor(canvas: fabric.Canvas) {
+  constructor(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     this.canvas = canvas;
+    this.ctx = ctx;
     // 保存初始状态
     this.save();
   }
 
-  /** 保存当前画布状态到 undo 栈 */
+  /** 保存当前画布快照 */
   save(): void {
     if (this.locked) return;
-
-    const json = JSON.stringify(this.canvas.toJSON());
-    this.undoStack.push(json);
-
-    // 限制栈大小
+    const dataUrl = this.canvas.toDataURL('image/png');
+    this.undoStack.push(dataUrl);
     if (this.undoStack.length > MAX_HISTORY) {
       this.undoStack.shift();
     }
-
-    // 新操作清空 redo 栈
     this.redoStack = [];
   }
 
   /** 撤销 */
   async undo(): Promise<boolean> {
     if (this.undoStack.length <= 1) return false;
-
     this.locked = true;
-
-    // 当前状态移到 redo 栈
     const current = this.undoStack.pop()!;
     this.redoStack.push(current);
-
-    // 恢复上一个状态
     const prev = this.undoStack[this.undoStack.length - 1];
-    await this.canvas.loadFromJSON(prev);
-    this.canvas.renderAll();
-
+    await this.restoreSnapshot(prev);
     this.locked = false;
     return true;
   }
@@ -58,26 +46,32 @@ export class CanvasHistory {
   /** 重做 */
   async redo(): Promise<boolean> {
     if (this.redoStack.length === 0) return false;
-
     this.locked = true;
-
-    // 从 redo 栈恢复状态
     const next = this.redoStack.pop()!;
     this.undoStack.push(next);
-
-    await this.canvas.loadFromJSON(next);
-    this.canvas.renderAll();
-
+    await this.restoreSnapshot(next);
     this.locked = false;
     return true;
   }
 
-  /** 是否可撤销 */
+  /** 从 dataUrl 恢复画布 */
+  private restoreSnapshot(dataUrl: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.drawImage(img, 0, 0);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
   get canUndo(): boolean {
     return this.undoStack.length > 1;
   }
 
-  /** 是否可重做 */
   get canRedo(): boolean {
     return this.redoStack.length > 0;
   }
