@@ -87,7 +87,7 @@ export function useVoiceCanvas(
   const pendingAlternativesRef = useRef<Alternative[]>([]);
 
   // 保存画布状态到后端（防抖）
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const saveCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -121,7 +121,6 @@ export function useVoiceCanvas(
       if (pendingAlternativesRef.current.length > 0) {
         const selected = matchAlternativeSelection(text, pendingAlternativesRef.current);
         if (selected) {
-          const alts = pendingAlternativesRef.current;
           pendingAlternativesRef.current = [];
           setAlternatives([]);
           // 添加用户消息
@@ -137,12 +136,13 @@ export function useVoiceCanvas(
           if (canvas && ctx) {
             processingRef.current = true;
             setState('executing');
-            if (selected.type === 'code_execute' && selected.code) {
-              const result = executeCode(ctx, canvas.width, canvas.height, selected.code);
+            const cmd = selected.command;
+            if (cmd.type === 'code_execute' && cmd.code) {
+              const result = executeCode(ctx, canvas.width, canvas.height, cmd.code);
               speak(result.message);
               setLastMessage(result.message);
             } else {
-              const result = executeCommand(canvas, ctx, selected);
+              const result = executeCommand(canvas, ctx, cmd);
               speak(result.message);
               setLastMessage(result.message);
             }

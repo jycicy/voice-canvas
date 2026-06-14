@@ -11,7 +11,6 @@ interface VoiceControlProps {
   isSupported: boolean;
   state: ProcessingState;
   recognizedText: string;
-  lastMessage: string;
   error: string | null;
   onStart: () => void;
   onStop: () => void;
@@ -29,7 +28,6 @@ export function VoiceControl({
   isSupported,
   state,
   recognizedText,
-  lastMessage,
   error,
   onStart,
   onStop,

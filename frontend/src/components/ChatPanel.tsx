@@ -4,7 +4,8 @@
  * 包含：消息列表 + 建议列表 + 输入框 + 语音按钮
  */
 
-import { useRef, useEffect, FormEvent } from 'react';
+import { useRef, useEffect } from 'react';
+import type { FormEvent } from 'react';
 import type { ProcessingState } from '../hooks/useVoiceCanvas';
 import type { DrawCommand } from '../lib/canvasExecutor';
 
@@ -28,7 +29,6 @@ interface ChatPanelProps {
   isSupported: boolean;
   error: string | null;
   alternatives: Alternative[];
-  lastMessage: string;
   onStartListening: () => void;
   onStopListening: () => void;
   onSelectAlternative: (command: DrawCommand) => void;
@@ -44,7 +44,6 @@ export default function ChatPanel({
   isSupported,
   error,
   alternatives,
-  lastMessage,
   onStartListening,
   onStopListening,
   onSelectAlternative,

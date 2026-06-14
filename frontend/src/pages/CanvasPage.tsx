@@ -92,7 +92,6 @@ export default function CanvasPage() {
         isSupported={isSupported}
         error={error}
         alternatives={alternatives}
-        lastMessage={lastMessage}
         onStartListening={startListening}
         onStopListening={stopListening}
         onSelectAlternative={selectAlternative}
