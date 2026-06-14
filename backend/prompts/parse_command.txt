@@ -2,47 +2,40 @@
 
 ## 输出格式
 
-只输出一个 JSON 对象，不要输出其他内容：
+只输出一个 JSON 对象，不要输出其他内容。
+
+## 命令类型（三选一）
+
+### 1. 简单图形 → type: "draw_shape"
+
+画圆形、矩形、三角形、直线、文字等基本图形时，使用此类型。前端直接绘制，无需生成代码。
 
 ```json
 {
-  "type": "code_execute",
-  "code": "Canvas 2D 绘图代码",
-  "speak": "语音反馈文本",
-  "confidence": 0.95
-}
-```
-
-## 命令类型
-
-### 1. 绘图类 → type: "code_execute"
-
-所有绘图操作都通过 Canvas 2D API 代码实现。可用变量：
-- `ctx` — CanvasRenderingContext2D 画布上下文
-- `W` — 画布宽度（像素）
-- `H` — 画布高度（像素）
-
-### 2. 操作类 → type: "canvas_action"
-
-仅用于以下操作：
-- 撤销/重做：`{"type":"canvas_action","action":"undo","speak":"已撤销"}`
-- 清空画布：`{"type":"canvas_action","action":"clear","speak":"已清空"}`
-- 导出图片：`{"type":"canvas_action","action":"export","speak":"已导出"}`
-- 缩放：`{"type":"canvas_action","action":"zoomIn/zoomOut/resetView","speak":"..."}`
-
-## Canvas 2D 绘图代码示例
-
-### 画圆形
-```json
-{
-  "type": "code_execute",
-  "code": "ctx.beginPath(); ctx.arc(W/2, H/2, 80, 0, Math.PI*2); ctx.fillStyle='#FF6B6B'; ctx.fill(); ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.stroke();",
+  "type": "draw_shape",
+  "shape": "circle",
+  "params": { "x": "W/2", "y": "H/2", "radius": 80, "fill": "#FF6B6B", "stroke": "#333", "strokeWidth": 2 },
   "speak": "画了一个红色圆形",
   "confidence": 0.95
 }
 ```
 
-### 画渐变矩形
+支持的 shape 值和对应 params：
+- `circle`：`x`, `y`, `radius`, `fill?`, `stroke?`, `strokeWidth?`
+- `rect`：`x`, `y`, `width`, `height`, `fill?`, `stroke?`, `strokeWidth?`
+- `triangle`：`x`, `y`, `size`, `fill?`, `stroke?`, `strokeWidth?`
+- `line`：`x1`, `y1`, `x2`, `y2`, `stroke?`, `strokeWidth?`
+- `text`：`x`, `y`, `text`, `fontSize?`, `fill?`, `fontFamily?`
+- `ellipse`：`x`, `y`, `radiusX`, `radiusY`, `fill?`, `stroke?`, `strokeWidth?`
+
+坐标值可以是数字或字符串表达式（如 "W/2", "H/2", "W/4"）。
+
+### 2. 复杂图形 → type: "code_execute"
+
+渐变、粒子、星空、彩虹、房子、树、动画效果等复杂图形，让 LLM 生成 Canvas 2D 代码。
+
+可用变量：`ctx`(CanvasRenderingContext2D), `W`(画布宽度), `H`(画布高度)
+
 ```json
 {
   "type": "code_execute",
@@ -52,118 +45,73 @@
 }
 ```
 
-### 画文字
+code_execute 代码示例：
+
+渐变矩形：
 ```json
-{
-  "type": "code_execute",
-  "code": "ctx.font='bold 48px sans-serif'; ctx.fillStyle='#333'; ctx.textAlign='center'; ctx.fillText('Hello World',W/2,H/2);",
-  "speak": "写了文字",
-  "confidence": 0.95
-}
+{"type":"code_execute","code":"const g=ctx.createLinearGradient(W/2-100,H/2-60,W/2+100,H/2+60); g.addColorStop(0,'#FF6B6B'); g.addColorStop(1,'#4ECDC4'); ctx.fillStyle=g; ctx.fillRect(W/2-100,H/2-60,200,120);","speak":"画了一个渐变矩形","confidence":0.95}
 ```
 
-### 画星空
+星空：
 ```json
-{
-  "type": "code_execute",
-  "code": "ctx.fillStyle='#0a0a2e'; ctx.fillRect(0,0,W,H); for(let i=0;i<200;i++){const x=Math.random()*W,y=Math.random()*H*0.7,r=Math.random()*2,a=Math.random()*0.8+0.2; ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore();}",
-  "speak": "画了一片星空",
-  "confidence": 0.9
-}
+{"type":"code_execute","code":"ctx.fillStyle='#0a0a2e'; ctx.fillRect(0,0,W,H); for(let i=0;i<200;i++){const x=Math.random()*W,y=Math.random()*H*0.7,r=Math.random()*2,a=Math.random()*0.8+0.2; ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore();}","speak":"画了一片星空","confidence":0.9}
 ```
 
-### 画彩虹
+彩虹：
 ```json
-{
-  "type": "code_execute",
-  "code": "const colors=['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#4B0089','#9400D3']; const cx=W/2,cy=H*0.7; for(let i=0;i<7;i++){ctx.beginPath(); ctx.arc(cx,cy,200-i*20,Math.PI,0); ctx.strokeStyle=colors[i]; ctx.lineWidth=18; ctx.stroke();}",
-  "speak": "画了一道彩虹",
-  "confidence": 0.9
-}
+{"type":"code_execute","code":"const colors=['#FF0000','#FF7F00','#FFFF00','#00FF00','#0000FF','#4B0089','#9400D3']; const cx=W/2,cy=H*0.7; for(let i=0;i<7;i++){ctx.beginPath(); ctx.arc(cx,cy,200-i*20,Math.PI,0); ctx.strokeStyle=colors[i]; ctx.lineWidth=18; ctx.stroke();}","speak":"画了一道彩虹","confidence":0.9}
 ```
 
-### 画三角形
+房子：
 ```json
-{
-  "type": "code_execute",
-  "code": "ctx.beginPath(); ctx.moveTo(W/2,H/2-80); ctx.lineTo(W/2-70,H/2+50); ctx.lineTo(W/2+70,H/2+50); ctx.closePath(); ctx.fillStyle='#FFD93D'; ctx.fill(); ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.stroke();",
-  "speak": "画了一个三角形",
-  "confidence": 0.95
-}
+{"type":"code_execute","code":"ctx.fillStyle='#8B4513'; ctx.fillRect(W/2-60,H/2-20,120,80); ctx.beginPath(); ctx.moveTo(W/2-80,H/2-20); ctx.lineTo(W/2,H/2-80); ctx.lineTo(W/2+80,H/2-20); ctx.closePath(); ctx.fillStyle='#FF6347'; ctx.fill(); ctx.fillStyle='#87CEEB'; ctx.fillRect(W/2-20,H/2,40,40); ctx.fillStyle='#654321'; ctx.fillRect(W/2+20,H/2+20,20,40);","speak":"画了一座房子","confidence":0.9}
 ```
 
-### 画直线
+树：
 ```json
-{
-  "type": "code_execute",
-  "code": "ctx.beginPath(); ctx.moveTo(W/4,H/2); ctx.lineTo(W*3/4,H/2); ctx.strokeStyle='#333'; ctx.lineWidth=3; ctx.stroke();",
-  "speak": "画了一条直线",
-  "confidence": 0.95
-}
+{"type":"code_execute","code":"ctx.fillStyle='#8B4513'; ctx.fillRect(W/2-10,H/2,20,60); ctx.beginPath(); ctx.arc(W/2,H/2-10,50,0,Math.PI*2); ctx.fillStyle='#228B22'; ctx.fill(); ctx.beginPath(); ctx.arc(W/2-25,H/2+5,35,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(W/2+25,H/2+5,35,0,Math.PI*2); ctx.fill();","speak":"画了一棵树","confidence":0.9}
 ```
 
-### 画圆形渐变光晕
+光晕：
 ```json
-{
-  "type": "code_execute",
-  "code": "const g=ctx.createRadialGradient(W/2,H/2,10,W/2,H/2,150); g.addColorStop(0,'rgba(255,100,100,0.8)'); g.addColorStop(0.5,'rgba(255,100,100,0.2)'); g.addColorStop(1,'transparent'); ctx.fillStyle=g; ctx.fillRect(W/2-150,H/2-150,300,300);",
-  "speak": "画了一个光晕",
-  "confidence": 0.9
-}
+{"type":"code_execute","code":"const g=ctx.createRadialGradient(W/2,H/2,10,W/2,H/2,150); g.addColorStop(0,'rgba(255,100,100,0.8)'); g.addColorStop(0.5,'rgba(255,100,100,0.2)'); g.addColorStop(1,'transparent'); ctx.fillStyle=g; ctx.fillRect(W/2-150,H/2-150,300,300);","speak":"画了一个光晕","confidence":0.9}
 ```
 
-### 画房子
-```json
-{
-  "type": "code_execute",
-  "code": "ctx.fillStyle='#8B4513'; ctx.fillRect(W/2-60,H/2-20,120,80); ctx.beginPath(); ctx.moveTo(W/2-80,H/2-20); ctx.lineTo(W/2,H/2-80); ctx.lineTo(W/2+80,H/2-20); ctx.closePath(); ctx.fillStyle='#FF6347'; ctx.fill(); ctx.fillStyle='#87CEEB'; ctx.fillRect(W/2-20,H/2,40,40); ctx.fillStyle='#654321'; ctx.fillRect(W/2+20,H/2+20,20,40);",
-  "speak": "画了一座房子",
-  "confidence": 0.9
-}
-```
+### 3. 操作类 → type: "canvas_action"
 
-### 画树
-```json
-{
-  "type": "code_execute",
-  "code": "ctx.fillStyle='#8B4513'; ctx.fillRect(W/2-10,H/2,20,60); ctx.beginPath(); ctx.arc(W/2,H/2-10,50,0,Math.PI*2); ctx.fillStyle='#228B22'; ctx.fill(); ctx.beginPath(); ctx.arc(W/2-25,H/2+5,35,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(W/2+25,H/2+5,35,0,Math.PI*2); ctx.fill();",
-  "speak": "画了一棵树",
-  "confidence": 0.9
-}
-```
+撤销/清空/导出等操作：
+- 撤销：`{"type":"canvas_action","action":"undo","speak":"已撤销","confidence":1.0}`
+- 恢复：`{"type":"canvas_action","action":"redo","speak":"已恢复","confidence":1.0}`
+- 清空：`{"type":"canvas_action","action":"clear","speak":"已清空","confidence":1.0}`
+- 导出：`{"type":"canvas_action","action":"export","speak":"已导出","confidence":1.0}`
 
-### 画箭头
-```json
-{
-  "type": "code_execute",
-  "code": "ctx.beginPath(); ctx.moveTo(W/4,H/2); ctx.lineTo(W*3/4,H/2); ctx.lineTo(W*3/4-20,H/2-15); ctx.moveTo(W*3/4,H/2); ctx.lineTo(W*3/4-20,H/2+15); ctx.strokeStyle='#333'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.stroke();",
-  "speak": "画了一个箭头",
-  "confidence": 0.95
-}
-```
+## 判断规则
 
-## 代码规范
+**用 draw_shape 的场景：**
+- 画一个圆形/圆圈/圆
+- 画一个矩形/长方形/正方形/方形
+- 画一个三角形
+- 画一条线/直线
+- 写文字/添加文字
+- 画一个椭圆
+- 简单图形 + 颜色描述（如"画一个红色圆形"）
 
-1. 代码必须是合法的 JavaScript，使用 Canvas 2D API
-2. 画布坐标：左上角 (0,0)，右下角 (W,H)
-3. 使用 `W/2`, `H/2` 作为画布中心点
-4. 颜色用双引号的 hex 字符串，如 "#FF0000"
-5. 需要透明度时用 `ctx.save()` / `ctx.globalAlpha` / `ctx.restore()`
-6. 渐变：`ctx.createLinearGradient()` 或 `ctx.createRadialGradient()`
-7. 路径：`ctx.beginPath()` → 绘制命令 → `ctx.fill()` / `ctx.stroke()`
-8. 代码写在一行内，用分号分隔语句
-9. 确保括号、引号完全匹配，不能有多余或缺少
+**用 code_execute 的场景：**
+- 渐变效果（线性渐变、径向渐变）
+- 粒子、星空、雨、雪等随机分布的元素
+- 彩虹、光晕等多层叠加效果
+- 房子、树、箭头等由多个基本图形组合的复杂图案
+- 需要循环、随机数、数学计算的图形
+- 用户明确说"画一幅XXX画"
 
 ## 复合指令
 
-用户可能一次说多个操作，返回数组：
+用户一次说多个操作，返回数组：
 ```json
-{
-  "commands": [
-    {"type":"code_execute","code":"...","speak":"...","confidence":0.9},
-    {"type":"code_execute","code":"...","speak":"...","confidence":0.9}
-  ]
-}
+{"commands":[
+  {"type":"draw_shape","shape":"circle","params":{"x":"W/3","y":"H/2","radius":50,"fill":"#FF6B6B"},"speak":"画了一个红色圆形","confidence":0.95},
+  {"type":"draw_shape","shape":"rect","params":{"x":"W*2/3-50","y":"H/2-50","width":100,"height":100,"fill":"#4ECDC4"},"speak":"画了一个绿色矩形","confidence":0.95}
+]}
 ```
 
 ## 置信度说明
@@ -176,6 +124,7 @@
 ## 注意事项
 
 1. 只输出 JSON，不要输出解释
-2. 代码中的单引号不影响 JSON 解析（JSON 字符串用双引号）
-3. 不确定时降低 confidence 并提供 alternatives
-4. 语音反馈 speak 用简短的中文描述
+2. 优先使用 draw_shape（简单快速），只有复杂图案才用 code_execute
+3. 坐标用 "W/2" "H/2" 等表达式，让图形居中
+4. 不确定时降低 confidence 并提供 alternatives
+5. 语音反馈 speak 用简短的中文描述

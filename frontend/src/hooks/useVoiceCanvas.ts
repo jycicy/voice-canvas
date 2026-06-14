@@ -7,7 +7,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { useSpeechRecognition } from './useSpeechRecognition';
 import { parseCompoundCommand, saveCanvasState, getSessionId } from '../lib/api';
-import { executeCommand, executeCode } from '../lib/canvasExecutor';
+import { executeCommand, executeCode, executeShape } from '../lib/canvasExecutor';
 import type { DrawCommand } from '../lib/canvasExecutor';
 import { CanvasHistory } from '../lib/canvasHistory';
 
@@ -136,15 +136,16 @@ export function useVoiceCanvas(
             processingRef.current = true;
             setState('executing');
             const cmd = selected.command;
-            if (cmd.type === 'code_execute' && cmd.code) {
-              const result = executeCode(ctx, canvas.width, canvas.height, cmd.code);
-              speak(result.message);
-              setLastMessage(result.message);
+            let result: { success: boolean; message: string };
+            if (cmd.type === 'draw_shape' && cmd.shape && cmd.params) {
+              result = executeShape(ctx, canvas.width, canvas.height, cmd.shape, cmd.params);
+            } else if (cmd.type === 'code_execute' && cmd.code) {
+              result = executeCode(ctx, canvas.width, canvas.height, cmd.code);
             } else {
-              const result = executeCommand(canvas, ctx, cmd);
-              speak(result.message);
-              setLastMessage(result.message);
+              result = executeCommand(canvas, ctx, cmd);
             }
+            speak(result.message);
+            setLastMessage(result.message);
             processingRef.current = false;
             setState('idle');
             historyRef.current?.save();
@@ -187,54 +188,40 @@ export function useVoiceCanvas(
           return;
         }
 
-        if (firstCommand.type === 'code_execute' && firstCommand.code) {
-          // Canvas 2D 代码绘图
-          setState('executing');
-          setLastMessage('正在执行绘图代码...');
-          speak(firstCommand.speak || '正在绘制');
+        // 执行命令
+        setState('executing');
+        speak(firstCommand.speak || '正在绘制');
+        let lastResult: { success: boolean; message: string } | undefined;
 
-          const result = executeCode(ctx, canvas.width, canvas.height, firstCommand.code);
-          speak(result.message);
-          setLastMessage(result.message);
+        for (const cmd of commands) {
+          if (cmd.action === 'undo') {
+            const ok = await historyRef.current?.undo();
+            lastResult = { success: !!ok, message: ok ? '已撤销' : '没有可撤销的操作' };
+          } else if (cmd.action === 'redo') {
+            const ok = await historyRef.current?.redo();
+            lastResult = { success: !!ok, message: ok ? '已恢复' : '没有可恢复的操作' };
+          } else if (cmd.type === 'draw_shape' && cmd.shape && cmd.params) {
+            lastResult = executeShape(ctx, canvas.width, canvas.height, cmd.shape, cmd.params);
+          } else if (cmd.type === 'code_execute' && cmd.code) {
+            lastResult = executeCode(ctx, canvas.width, canvas.height, cmd.code);
+          } else {
+            lastResult = executeCommand(canvas, ctx, cmd);
+          }
+        }
+
+        if (lastResult) {
+          const msg = commands.length > 1
+            ? `已执行 ${commands.length} 个操作`
+            : lastResult.message;
+          speak(msg);
+          setLastMessage(msg);
           setMessages((prev) => [...prev, {
             id: (Date.now() + 1).toString(),
             role: 'system',
-            text: result.message,
+            text: msg,
             time: new Date(),
           }]);
-          if (result.success) {
-            historyRef.current?.save();
-            saveCanvas();
-          }
-        } else {
-          // 画布操作
-          setState('executing');
-          let lastResult;
-
-          for (const cmd of commands) {
-            if (cmd.action === 'undo') {
-              const ok = await historyRef.current?.undo();
-              lastResult = { success: !!ok, message: ok ? '已撤销' : '没有可撤销的操作' };
-            } else if (cmd.action === 'redo') {
-              const ok = await historyRef.current?.redo();
-              lastResult = { success: !!ok, message: ok ? '已重做' : '没有可重做的操作' };
-            } else {
-              lastResult = executeCommand(canvas, ctx, cmd);
-            }
-          }
-
-          if (lastResult) {
-            const msg = commands.length > 1
-              ? `已执行 ${commands.length} 个操作`
-              : lastResult.message;
-            speak(msg);
-            setLastMessage(msg);
-            setMessages((prev) => [...prev, {
-              id: (Date.now() + 1).toString(),
-              role: 'system',
-              text: msg,
-              time: new Date(),
-            }]);
+          if (lastResult.success) {
             historyRef.current?.save();
             saveCanvas();
           }

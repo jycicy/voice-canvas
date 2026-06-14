@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 
 
 class CommandType(str, Enum):
-    """命令类型：画布操作 or 代码绘图"""
+    """命令类型：画布操作、简单图形、代码绘图"""
     CANVAS_ACTION = "canvas_action"
+    DRAW_SHAPE = "draw_shape"
     CODE_EXECUTE = "code_execute"
 
 
@@ -60,25 +61,40 @@ class DrawTarget(BaseModel):
 
 
 class DrawParams(BaseModel):
-    """绘图参数"""
-    left: Optional[float] = Field(None, description="X 坐标")
-    top: Optional[float] = Field(None, description="Y 坐标")
+    """绘图参数（兼容 draw_shape 和 canvas_action）"""
+    # 坐标（支持字符串表达式如 "W/2"）
+    x: Optional[str] = Field(None, description="X 坐标，可为表达式如 'W/2'")
+    y: Optional[str] = Field(None, description="Y 坐标")
+    x1: Optional[str] = Field(None, description="起点 X（直线）")
+    y1: Optional[str] = Field(None, description="起点 Y（直线）")
+    x2: Optional[str] = Field(None, description="终点 X（直线）")
+    y2: Optional[str] = Field(None, description="终点 Y（直线）")
+    left: Optional[float] = Field(None, description="X 坐标（旧格式）")
+    top: Optional[float] = Field(None, description="Y 坐标（旧格式）")
+    # 尺寸
     width: Optional[float] = Field(None, description="宽度")
     height: Optional[float] = Field(None, description="高度")
-    radius: Optional[float] = Field(None, description="半径（圆形）")
-    fill: Optional[str] = Field(None, description="填充颜色，如 '#FF0000'")
+    radius: Optional[float] = Field(None, description="半径")
+    radiusX: Optional[float] = Field(None, description="椭圆 X 半径")
+    radiusY: Optional[float] = Field(None, description="椭圆 Y 半径")
+    size: Optional[float] = Field(None, description="尺寸（三角形）")
+    # 样式
+    fill: Optional[str] = Field(None, description="填充颜色")
     stroke: Optional[str] = Field(None, description="描边颜色")
-    stroke_width: Optional[float] = Field(None, alias="strokeWidth", description="描边宽度")
+    strokeWidth: Optional[float] = Field(None, description="描边宽度")
+    # 文字
     text: Optional[str] = Field(None, description="文字内容")
-    font_size: Optional[int] = Field(None, alias="fontSize", description="字体大小")
+    fontSize: Optional[int] = Field(None, description="字体大小")
+    fontFamily: Optional[str] = Field(None, description="字体")
+    # 变换
     angle: Optional[float] = Field(None, description="旋转角度")
-    scale_x: Optional[float] = Field(None, alias="scaleX", description="X 缩放")
-    scale_y: Optional[float] = Field(None, alias="scaleY", description="Y 缩放")
+    scaleX: Optional[float] = Field(None, description="X 缩放")
+    scaleY: Optional[float] = Field(None, description="Y 缩放")
     opacity: Optional[float] = Field(None, description="透明度 0-1")
-    dash: Optional[list[float]] = Field(None, description="虚线样式 [线长, 间距]")
-    line_height: Optional[float] = Field(None, alias="lineHeight", description="行高")
+    dash: Optional[list[float]] = Field(None, description="虚线样式")
+    lineHeight: Optional[float] = Field(None, description="行高")
 
-    model_config = {"populate_by_name": True}
+    model_config = {"extra": "allow"}
 
 
 class Alternative(BaseModel):
@@ -87,13 +103,38 @@ class Alternative(BaseModel):
     command: "DrawCommand" = Field(..., description="对应的绘图命令")
 
 
+class ShapeParams(BaseModel):
+    """简单图形参数"""
+    x: Optional[str] = Field(None, description="X 坐标，可为表达式如 'W/2'")
+    y: Optional[str] = Field(None, description="Y 坐标")
+    x1: Optional[str] = Field(None, description="起点 X（直线）")
+    y1: Optional[str] = Field(None, description="起点 Y（直线）")
+    x2: Optional[str] = Field(None, description="终点 X（直线）")
+    y2: Optional[str] = Field(None, description="终点 Y（直线）")
+    radius: Optional[float] = Field(None, description="半径")
+    radiusX: Optional[float] = Field(None, description="椭圆 X 半径")
+    radiusY: Optional[float] = Field(None, description="椭圆 Y 半径")
+    width: Optional[float] = Field(None, description="宽度")
+    height: Optional[float] = Field(None, description="高度")
+    size: Optional[float] = Field(None, description="尺寸（三角形）")
+    fill: Optional[str] = Field(None, description="填充颜色")
+    stroke: Optional[str] = Field(None, description="描边颜色")
+    strokeWidth: Optional[float] = Field(None, description="描边宽度")
+    text: Optional[str] = Field(None, description="文字内容")
+    fontSize: Optional[int] = Field(None, description="字体大小")
+    fontFamily: Optional[str] = Field(None, description="字体")
+
+    model_config = {"extra": "allow"}
+
+
 class DrawCommand(BaseModel):
     """完整的绘图命令"""
     type: CommandType = Field(..., description="命令类型")
     action: Optional[CanvasAction] = Field(None, description="画布操作类型（type=canvas_action 时必填）")
+    shape: Optional[str] = Field(None, description="图形类型（type=draw_shape 时必填）：circle/rect/triangle/line/text/ellipse")
     target: Optional[DrawTarget] = Field(None, description="操作目标")
     params: Optional[DrawParams] = Field(None, description="绘图参数")
-    code: Optional[str] = Field(None, description="Fabric.js 绘图代码（type=code_execute 时必填）")
+    code: Optional[str] = Field(None, description="Canvas 2D 代码（type=code_execute 时必填）")
     confidence: float = Field(1.0, ge=0, le=1, description="解析置信度 0-1")
     speak: str = Field("", description="TTS 语音反馈文本")
     alternatives: list[Alternative] = Field(default_factory=list, description="备选指令列表（低置信度时）")

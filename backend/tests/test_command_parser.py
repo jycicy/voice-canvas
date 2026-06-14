@@ -136,7 +136,7 @@ class TestParseCommand:
             cmd = await parse_command("放大两倍")
 
         assert cmd.action == "scale"
-        assert cmd.params.scale_x == 2
+        assert cmd.params.scaleX == 2
 
     @pytest.mark.asyncio
     async def test_parse_rotate_command(self):
