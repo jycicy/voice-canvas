@@ -1,66 +1,56 @@
-import { useEffect, useRef, useCallback } from 'react';
-import * as fabric from 'fabric';
+/**
+ * 画布组件 — 原生 Canvas 2D
+ */
+
+import { useEffect, useRef } from 'react';
 import { CanvasHistory } from '../lib/canvasHistory';
 
 interface DrawingCanvasProps {
-  canvasRef: React.MutableRefObject<fabric.Canvas | null>;
+  canvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
+  ctxRef: React.MutableRefObject<CanvasRenderingContext2D | null>;
   historyRef: React.MutableRefObject<CanvasHistory | null>;
 }
 
-export default function DrawingCanvas({ canvasRef, historyRef }: DrawingCanvasProps) {
+export default function DrawingCanvas({ canvasRef, ctxRef, historyRef }: DrawingCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const htmlCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // 初始化 Fabric.js 画布 + 历史管理
   useEffect(() => {
-    if (!htmlCanvasRef.current || !containerRef.current) return;
-
+    const canvas = canvasRef.current;
     const container = containerRef.current;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    if (!canvas || !container) return;
 
-    const canvas = new fabric.Canvas(htmlCanvasRef.current, {
-      width,
-      height,
-      backgroundColor: '#ffffff',
-      selection: true,
-    });
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctxRef.current = ctx;
 
-    canvasRef.current = canvas;
-    historyRef.current = new CanvasHistory(canvas);
-
-    // 对象变化时自动保存历史
-    const saveHistory = () => historyRef.current?.save();
-    canvas.on('object:added', saveHistory);
-    canvas.on('object:modified', saveHistory);
-    canvas.on('object:removed', saveHistory);
-
-    // 响应窗口大小变化
-    const handleResize = () => {
+    // 设置画布尺寸
+    const resize = () => {
       const w = container.clientWidth;
       const h = container.clientHeight;
-      canvas.setDimensions({ width: w, height: h });
-      canvas.renderAll();
+      // 保存当前内容
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      canvas.width = w;
+      canvas.height = h;
+      // 恢复内容
+      ctx.putImageData(imageData, 0, 0);
     };
 
-    window.addEventListener('resize', handleResize);
+    resize();
 
+    // 初始化白色背景
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 初始化历史管理
+    historyRef.current = new CanvasHistory(canvas, ctx);
+
+    window.addEventListener('resize', resize);
     return () => {
-      window.removeEventListener('resize', handleResize);
-      canvas.off('object:added', saveHistory);
-      canvas.off('object:modified', saveHistory);
-      canvas.off('object:removed', saveHistory);
-      canvas.dispose();
-      canvasRef.current = null;
+      window.removeEventListener('resize', resize);
+      ctxRef.current = null;
       historyRef.current = null;
     };
-  }, [canvasRef, historyRef]);
-
-  // 暴露到 window 供调试
-  useEffect(() => {
-    (window as any).__canvas = canvasRef;
-    (window as any).__history = historyRef;
-  }, [canvasRef, historyRef]);
+  }, [canvasRef, ctxRef, historyRef]);
 
   return (
     <div
@@ -70,9 +60,13 @@ export default function DrawingCanvas({ canvasRef, historyRef }: DrawingCanvasPr
         height: '100%',
         position: 'relative',
         overflow: 'hidden',
+        background: '#f5f5f5',
       }}
     >
-      <canvas ref={htmlCanvasRef} />
+      <canvas
+        ref={canvasRef}
+        style={{ display: 'block', width: '100%', height: '100%' }}
+      />
     </div>
   );
 }

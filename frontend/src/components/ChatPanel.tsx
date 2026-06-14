@@ -121,10 +121,10 @@ export default function ChatPanel({
           </div>
         )}
 
-        {/* 建议列表 */}
+        {/* 建议列表（语音说编号选择） */}
         {alternatives.length > 0 && (
           <div className="chat-panel__suggestions">
-            <div className="chat-panel__suggestions-label">您是否想说：</div>
+            <div className="chat-panel__suggestions-label">请说编号选择：</div>
             <div className="chat-panel__suggestions-list">
               {alternatives.map((alt, i) => (
                 <button
@@ -132,7 +132,7 @@ export default function ChatPanel({
                   className="chat-panel__suggestion-btn"
                   onClick={() => onSelectAlternative(alt.command)}
                 >
-                  {alt.label}
+                  {i + 1}. {alt.label}
                 </button>
               ))}
             </div>
