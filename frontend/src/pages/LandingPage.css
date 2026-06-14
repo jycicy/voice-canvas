@@ -1,0 +1,195 @@
+/* ========== 落地页 ========== */
+.landing {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+/* 背景装饰圆 */
+.landing__bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.landing__circle {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+}
+
+.landing__circle--1 {
+  width: 400px;
+  height: 400px;
+  background: #dbeafe;
+  top: -100px;
+  right: -100px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.landing__circle--2 {
+  width: 300px;
+  height: 300px;
+  background: #ede9fe;
+  bottom: -80px;
+  left: -80px;
+  animation: float 10s ease-in-out infinite reverse;
+}
+
+.landing__circle--3 {
+  width: 200px;
+  height: 200px;
+  background: #fce7f3;
+  top: 40%;
+  left: 60%;
+  animation: float 6s ease-in-out infinite 2s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-30px); }
+}
+
+/* 主内容 */
+.landing__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 24px;
+  max-width: 600px;
+}
+
+.landing__badge {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-bottom: 24px;
+}
+
+.landing__title {
+  font-size: 64px;
+  font-weight: 700;
+  color: #1a1a1a;
+  letter-spacing: -1.5px;
+  line-height: 1.1;
+  margin-bottom: 16px;
+}
+
+.landing__subtitle {
+  font-size: 20px;
+  color: #666;
+  font-weight: 400;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.landing__desc {
+  font-size: 15px;
+  color: #999;
+  line-height: 1.6;
+  margin-bottom: 40px;
+}
+
+/* CTA 按钮 */
+.landing__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 36px;
+  border: none;
+  border-radius: 12px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.landing__cta:hover {
+  background: #333;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.landing__cta:active {
+  transform: translateY(0);
+}
+
+.landing__cta svg {
+  transition: transform 0.2s;
+}
+
+.landing__cta:hover svg {
+  transform: translateX(3px);
+}
+
+/* 特性标签 */
+.landing__features {
+  display: flex;
+  gap: 32px;
+  margin-top: 56px;
+}
+
+.landing__feature {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.landing__feature-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.landing__feature span {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* 底部 */
+.landing__footer {
+  position: absolute;
+  bottom: 24px;
+  font-size: 13px;
+  color: #bbb;
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .landing__title {
+    font-size: 42px;
+  }
+
+  .landing__subtitle {
+    font-size: 17px;
+  }
+
+  .landing__features {
+    gap: 20px;
+  }
+}

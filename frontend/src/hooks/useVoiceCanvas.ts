@@ -19,6 +19,13 @@ interface Alternative {
   command: DrawCommand;
 }
 
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'system';
+  text: string;
+  time: Date;
+}
+
 interface VoiceCanvasState {
   /** 当前处理状态 */
   state: ProcessingState;
@@ -34,6 +41,8 @@ interface VoiceCanvasState {
   error: string | null;
   /** 建议指令列表 */
   alternatives: Alternative[];
+  /** 聊天消息列表 */
+  messages: ChatMessage[];
   /** 控制方法 */
   startListening: () => void;
   stopListening: () => void;
@@ -52,6 +61,7 @@ export function useVoiceCanvas(
   const [lastCommand, setLastCommand] = useState<DrawCommand | null>(null);
   const [lastMessage, setLastMessage] = useState('');
   const [alternatives, setAlternatives] = useState<Alternative[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const speech = useSpeechRecognition();
   const processingRef = useRef(false);
@@ -88,6 +98,15 @@ export function useVoiceCanvas(
       processingRef.current = true;
       setState('parsing');
 
+      // 添加用户消息
+      const userMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        text,
+        time: new Date(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
       try {
         // 1. 调用后端解析（支持复合指令）
         const { commands } = await parseCompoundCommand(text);
@@ -113,6 +132,13 @@ export function useVoiceCanvas(
           const result = executeCode(canvasRef.current, firstCommand.code);
           speak(result.message);
           setLastMessage(result.message);
+          // 添加系统消息
+          setMessages((prev) => [...prev, {
+            id: (Date.now() + 1).toString(),
+            role: 'system',
+            text: result.message,
+            time: new Date(),
+          }]);
           if (result.success) {
             saveCanvas();
           }
@@ -140,6 +166,12 @@ export function useVoiceCanvas(
               : lastResult.message;
             speak(msg);
             setLastMessage(msg);
+            setMessages((prev) => [...prev, {
+              id: (Date.now() + 1).toString(),
+              role: 'system',
+              text: msg,
+              time: new Date(),
+            }]);
             saveCanvas();
           }
         }
@@ -155,6 +187,12 @@ export function useVoiceCanvas(
         }
         speak(msg);
         setLastMessage(msg);
+        setMessages((prev) => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: 'system',
+          text: msg,
+          time: new Date(),
+        }]);
       } finally {
         processingRef.current = false;
         setState('idle');
@@ -240,6 +278,7 @@ export function useVoiceCanvas(
     isSupported: speech.isSupported,
     error: speech.error,
     alternatives,
+    messages,
     startListening: speech.start,
     stopListening: speech.stop,
     selectAlternative,
