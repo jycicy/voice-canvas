@@ -22,7 +22,6 @@ const STATE_LABELS: Record<ProcessingState, string> = {
   listening: '正在聆听...',
   parsing: '正在理解...',
   executing: '正在执行...',
-  generating: 'AI 正在作画...',
 };
 
 export function VoiceControl({
@@ -36,8 +35,7 @@ export function VoiceControl({
   onStop,
 }: VoiceControlProps) {
   const isActive = isListening;
-  const isGenerating = state === 'generating';
-  const isDisabled = !isSupported || isGenerating;
+  const isDisabled = !isSupported;
 
   const handleClick = () => {
     if (isDisabled) return;
@@ -52,7 +50,7 @@ export function VoiceControl({
     <div className="voice-control">
       {/* 麦克风按钮 */}
       <button
-        className={`voice-btn ${isActive ? 'voice-btn--active' : ''} ${isGenerating ? 'voice-btn--generating' : ''}`}
+        className={`voice-btn ${isActive ? 'voice-btn--active' : ''}`}
         onClick={handleClick}
         disabled={isDisabled}
         title={isActive ? '停止聆听' : '开始聆听'}

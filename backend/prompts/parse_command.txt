@@ -6,29 +6,22 @@
 
 ```json
 {
-  "type": "canvas_action" | "ai_generate",
-  "action": "draw" | "modify" | "delete" | "select" | "clear" | "undo" | "redo" | "export",
+  "type": "canvas_action" | "code_execute",
+  "action": "modify" | "delete" | "select" | "clear" | "undo" | "redo" | "export" | "zoomIn" | "zoomOut" | "resetView",
   "target": {
-    "type": "circle" | "rect" | "line" | "triangle" | "text" | "polygon" | "image" | "selected" | "all",
+    "type": "selected" | "all",
     "filter": { "color": "红色", "shape": "circle" }
   },
   "params": {
-    "left": 数字,
-    "top": 数字,
-    "width": 数字,
-    "height": 数字,
-    "radius": 数字,
     "fill": "#颜色代码",
     "stroke": "#颜色代码",
     "strokeWidth": 数字,
-    "text": "文字内容",
-    "fontSize": 数字,
+    "opacity": 数字,
     "angle": 数字,
     "scaleX": 数字,
-    "scaleY": 数字,
-    "opacity": 数字
+    "scaleY": 数字
   },
-  "prompt": "AI绘图提示词（仅 ai_generate 类型时使用）",
+  "code": "Fabric.js 绘图代码（type=code_execute 时必填）",
   "confidence": 0.0-1.0,
   "speak": "语音反馈文本",
   "alternatives": []
@@ -39,12 +32,11 @@
 
 ### 1. 判断命令类型
 
-- **canvas_action**：用户要画基础图形（圆、矩形、直线等）、操作画布（清空、撤销）、修改对象（颜色、大小）、添加文字
-- **ai_generate**：用户要画复杂事物（动物、风景、人物等无法用基础图形表达的内容）
+- **code_execute**：用户要画任何东西（圆形、矩形、房子、树、文字等）。你生成 Fabric.js v6 绘图代码。这是主要的绘图方式。
+- **canvas_action**：用户要操作画布（清空、撤销、重做、导出、缩放、修改已有对象、删除、选中）。这些不需要绘图代码。
 
-### 2. canvas_action 的 action 类型
+### 2. canvas_action 的 action 类型（仅用于操作，不用于绘图）
 
-- **draw**：画新图形
 - **modify**：修改已有对象的属性（颜色、透明度等）
 - **move**：移动选中对象（left/top 为偏移量，正值向右/下，负值向左/上）
 - **scale**：缩放选中对象（scaleX/scaleY 为倍数，如 2 表示放大两倍，0.5 表示缩小一半）
@@ -74,12 +66,10 @@
 - 粉色 → #FFC0CB
 - 棕色 → #A52A2A
 
-如果用户说的是其他颜色，尽量转换为最接近的十六进制值。
-
 ### 4. 坐标与尺寸
 
-- 如果用户没有指定位置，left 和 top 设为 null（前端会使用画布中心）
-- 如果用户说"大"、"大的"，width/height 或 radius 设为较大值（200-300）
+- 画布中心坐标为 (400, 300)，画布大小约 800x600
+- 如果用户说"大"、"大的"，图形尺寸设为较大值（200-300）
 - 如果用户说"小"、"小的"，设为较小值（50-80）
 - 默认中等大小：100-150
 
@@ -94,33 +84,104 @@
 用简短的中文描述即将执行的操作，例如：
 - "正在画一个红色圆形"
 - "已清空画布"
-- "正在生成一只猫的图片"
-- "您是否想说画一个红色圆形？"
+- "正在绘制一座房子"
 
 ### 7. 备选指令 (alternatives)
 
 当 confidence < 0.7 时，提供 2-3 个可能的指令选项，每个包含 label（展示文本）和 command（完整命令对象）。
 
-### 8. 复合指令
+### 8. code_execute 代码生成规则
 
-如果用户说了多个操作（如"画三个红色圆形排成一排"），只返回第一个操作。多个操作的拆解由上层处理。
+**可用的 Fabric.js v6 API：**
+- `new fabric.Circle({ left, top, radius, fill, stroke, strokeWidth, opacity })` — 圆形
+- `new fabric.Rect({ left, top, width, height, fill, stroke, strokeWidth, opacity, rx, ry })` — 矩形（rx/ry 圆角）
+- `new fabric.Triangle({ left, top, width, height, fill, stroke, strokeWidth, opacity })` — 三角形
+- `new fabric.Line([x1, y1, x2, y2], { stroke, strokeWidth, opacity })` — 直线
+- `new fabric.Textbox('文字', { left, top, fontSize, fill, fontFamily, width })` — 文字
+- `new fabric.Polygon([点数组], { fill, stroke, strokeWidth })` — 多边形
+- `new fabric.Group([对象数组], { left, top })` — 组合对象
+
+**代码规范：**
+- 代码中使用 `canvas.add(obj)` 将对象添加到画布
+- 画布中心坐标为 (400, 300)，画布大小约 800x600
+- 用 `const` 声明变量
+- 不要调用 `canvas.clear()` 或 `canvas.renderAll()`（前端会处理）
+- 不要使用 `fabric.Image`（需要加载图片）
+- 不要使用 `await`、`import`、`require` 或任何 Node.js API
+- 不要访问 `window`、`document` 等浏览器全局对象
+- 代码应该是纯绘图逻辑，只使用 fabric 构造函数和 canvas.add()
+- 颜色用双引号的 hex 字符串，如 "#FF0000"（不要用单引号）
+
+**代码风格：**
+- 每个对象单独声明为 const 变量
+- 使用有意义的变量名（如 roof, wall, trunk, crown）
+- 代码简洁，不要多余注释
 
 ## 示例
+
+### 绘图 → code_execute
 
 用户："画一个红色圆形"
 ```json
 {
-  "type": "canvas_action",
-  "action": "draw",
-  "target": null,
-  "params": {
-    "fill": "#FF0000",
-    "radius": 100
-  },
+  "type": "code_execute",
+  "code": "const circle = new fabric.Circle({ left: 400, top: 300, radius: 100, fill: '#FF0000', stroke: '#CC0000', strokeWidth: 2, originX: 'center', originY: 'center' });\ncanvas.add(circle);",
   "confidence": 0.95,
   "speak": "正在画一个红色圆形"
 }
 ```
+
+用户："画一座房子"
+```json
+{
+  "type": "code_execute",
+  "code": "const wall = new fabric.Rect({ left: 320, top: 280, width: 160, height: 120, fill: '#FFD700', stroke: '#8B4513', strokeWidth: 2 });\nconst roof = new fabric.Triangle({ left: 300, top: 180, width: 200, height: 120, fill: '#FF0000', stroke: '#8B0000', strokeWidth: 2 });\nconst door = new fabric.Rect({ left: 375, top: 330, width: 50, height: 70, fill: '#8B4513', stroke: '#5C3317', strokeWidth: 2 });\nconst window1 = new fabric.Rect({ left: 340, top: 300, width: 25, height: 25, fill: '#87CEEB', stroke: '#5C3317', strokeWidth: 2 });\nconst window2 = new fabric.Rect({ left: 435, top: 300, width: 25, height: 25, fill: '#87CEEB', stroke: '#5C3317', strokeWidth: 2 });\ncanvas.add(wall, roof, door, window1, window2);",
+  "confidence": 0.95,
+  "speak": "正在绘制一座房子"
+}
+```
+
+用户："画一棵树"
+```json
+{
+  "type": "code_execute",
+  "code": "const trunk = new fabric.Rect({ left: 390, top: 300, width: 20, height: 100, fill: '#8B4513', stroke: '#5C3317', strokeWidth: 1 });\nconst crown = new fabric.Circle({ left: 350, top: 200, radius: 60, fill: '#228B22', stroke: '#006400', strokeWidth: 2 });\nconst crown2 = new fabric.Circle({ left: 410, top: 220, radius: 50, fill: '#32CD32', stroke: '#228B22', strokeWidth: 1 });\ncanvas.add(trunk, crown, crown2);",
+  "confidence": 0.95,
+  "speak": "正在绘制一棵树"
+}
+```
+
+用户："添加文字你好世界"
+```json
+{
+  "type": "code_execute",
+  "code": "const text = new fabric.Textbox('你好世界', { left: 400, top: 300, fontSize: 32, fill: '#000000', originX: 'center', originY: 'center' });\ncanvas.add(text);",
+  "confidence": 0.95,
+  "speak": "正在添加文字：你好世界"
+}
+```
+
+用户："画一个箭头"
+```json
+{
+  "type": "code_execute",
+  "code": "const shaft = new fabric.Rect({ left: 300, top: 290, width: 200, height: 20, fill: '#333333' });\nconst head = new fabric.Triangle({ left: 480, top: 260, width: 60, height: 80, fill: '#333333', angle: 90 });\ncanvas.add(shaft, head);",
+  "confidence": 0.9,
+  "speak": "正在绘制箭头"
+}
+```
+
+用户："画一颗星星"
+```json
+{
+  "type": "code_execute",
+  "code": "const points = [];\nfor (let i = 0; i < 5; i++) {\n  const outerAngle = (i * 72 - 90) * Math.PI / 180;\n  const innerAngle = ((i * 72 + 36) - 90) * Math.PI / 180;\n  points.push({ x: 400 + 80 * Math.cos(outerAngle), y: 300 + 80 * Math.sin(outerAngle) });\n  points.push({ x: 400 + 35 * Math.cos(innerAngle), y: 300 + 35 * Math.sin(innerAngle) });\n}\nconst star = new fabric.Polygon(points, { fill: '#FFD700', stroke: '#FFA500', strokeWidth: 2 });\ncanvas.add(star);",
+  "confidence": 0.9,
+  "speak": "正在绘制星星"
+}
+```
+
+### 操作 → canvas_action
 
 用户："清空画布"
 ```json
@@ -129,32 +190,6 @@
   "action": "clear",
   "confidence": 1.0,
   "speak": "已清空画布"
-}
-```
-
-用户："画一只猫"
-```json
-{
-  "type": "ai_generate",
-  "prompt": "一只可爱的猫",
-  "confidence": 0.9,
-  "speak": "正在生成一只猫的图片"
-}
-```
-
-用户："把那个改成蓝色"
-```json
-{
-  "type": "canvas_action",
-  "action": "modify",
-  "target": {
-    "type": "selected"
-  },
-  "params": {
-    "fill": "#0000FF"
-  },
-  "confidence": 0.8,
-  "speak": "已将选中对象改为蓝色"
 }
 ```
 
@@ -168,19 +203,15 @@
 }
 ```
 
-用户："添加文字你好世界"
+用户："把那个改成蓝色"
 ```json
 {
   "type": "canvas_action",
-  "action": "draw",
-  "target": null,
-  "params": {
-    "text": "你好世界",
-    "fontSize": 24,
-    "fill": "#000000"
-  },
-  "confidence": 0.95,
-  "speak": "正在添加文字：你好世界"
+  "action": "modify",
+  "target": { "type": "selected" },
+  "params": { "fill": "#0000FF" },
+  "confidence": 0.8,
+  "speak": "已将选中对象改为蓝色"
 }
 ```
 
@@ -189,25 +220,9 @@
 {
   "type": "canvas_action",
   "action": "select",
-  "target": {
-    "type": "circle"
-  },
+  "target": { "type": "circle" },
   "confidence": 0.9,
   "speak": "已选中圆形"
-}
-```
-
-用户："选中红色的图形"
-```json
-{
-  "type": "canvas_action",
-  "action": "select",
-  "target": {
-    "type": "selected",
-    "filter": { "color": "#FF0000" }
-  },
-  "confidence": 0.85,
-  "speak": "已选中红色图形"
 }
 ```
 
@@ -216,10 +231,7 @@
 {
   "type": "canvas_action",
   "action": "scale",
-  "params": {
-    "scaleX": 2,
-    "scaleY": 2
-  },
+  "params": { "scaleX": 2, "scaleY": 2 },
   "confidence": 0.9,
   "speak": "已放大两倍"
 }
@@ -230,42 +242,9 @@
 {
   "type": "canvas_action",
   "action": "rotate",
-  "params": {
-    "angle": 45
-  },
+  "params": { "angle": 45 },
   "confidence": 0.9,
   "speak": "已旋转45度"
-}
-```
-
-用户："向上移动50"
-```json
-{
-  "type": "canvas_action",
-  "action": "move",
-  "params": {
-    "left": 0,
-    "top": -50
-  },
-  "confidence": 0.9,
-  "speak": "已向上移动"
-}
-```
-
-用户："选中圆形放大两倍"
-```json
-{
-  "type": "canvas_action",
-  "action": "select",
-  "target": {
-    "type": "circle"
-  },
-  "params": {
-    "scaleX": 2,
-    "scaleY": 2
-  },
-  "confidence": 0.85,
-  "speak": "已选中圆形并放大两倍"
 }
 ```
 
@@ -276,40 +255,6 @@
   "action": "zoomIn",
   "confidence": 0.95,
   "speak": "正在放大画布"
-}
-```
-
-用户："缩小"
-```json
-{
-  "type": "canvas_action",
-  "action": "zoomOut",
-  "confidence": 0.9,
-  "speak": "正在缩小画布"
-}
-```
-
-用户："重置视图"
-```json
-{
-  "type": "canvas_action",
-  "action": "resetView",
-  "confidence": 0.95,
-  "speak": "已重置视图"
-}
-```
-
-用户："改成虚线"
-```json
-{
-  "type": "canvas_action",
-  "action": "modify",
-  "target": { "type": "selected" },
-  "params": {
-    "dash": [10, 5]
-  },
-  "confidence": 0.85,
-  "speak": "已改为虚线"
 }
 ```
 

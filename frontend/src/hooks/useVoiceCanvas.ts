@@ -7,12 +7,12 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import * as fabric from 'fabric';
 import { useSpeechRecognition } from './useSpeechRecognition';
-import { parseCompoundCommand, generateImage, saveCanvasState, getSessionId } from '../lib/api';
-import { executeCommand } from '../lib/canvasExecutor';
+import { parseCompoundCommand, saveCanvasState, getSessionId } from '../lib/api';
+import { executeCommand, executeCode } from '../lib/canvasExecutor';
 import type { DrawCommand } from '../lib/canvasExecutor';
 import { CanvasHistory } from '../lib/canvasHistory';
 
-export type ProcessingState = 'idle' | 'listening' | 'parsing' | 'executing' | 'generating';
+export type ProcessingState = 'idle' | 'listening' | 'parsing' | 'executing';
 
 interface Alternative {
   label: string;
@@ -104,62 +104,17 @@ export function useVoiceCanvas(
         }
 
         // 2. 根据命令类型分发
-        if (firstCommand.type === 'ai_generate' && firstCommand.prompt) {
-          // AI 图像生成
-          setState('generating');
-          setLastMessage('正在生成图片，请稍候...');
-          speak(firstCommand.speak || '正在生成图片，请稍等');
+        if (firstCommand.type === 'code_execute' && firstCommand.code) {
+          // LLM 生成代码 → 沙箱执行
+          setState('executing');
+          setLastMessage('正在执行绘图代码...');
+          speak(firstCommand.speak || '正在绘制');
 
-          let imageUrl = '';
-          try {
-            imageUrl = await generateImage(firstCommand.prompt, {
-              onCompleted: (data) => {
-                setLastMessage(data.message);
-              },
-              onError: (data) => {
-                setLastMessage(`生成失败: ${data.message}`);
-              },
-            });
-          } catch (genError: any) {
-            console.error('[VoiceCanvas] 图像生成失败:', genError);
-            const errorMsg = genError.message || '图像生成失败';
-            setLastMessage(errorMsg);
-            speak('图像生成失败，请稍后重试');
-            return;
-          }
-
-          // 将图片加载到画布
-          if (imageUrl && canvasRef.current) {
-            try {
-              setLastMessage('正在加载图片到画布...');
-              const img = await fabric.FabricImage.fromURL(imageUrl);
-              const canvas = canvasRef.current;
-              const scale = Math.min(
-                (canvas.getWidth() * 0.6) / (img.width || 1),
-                (canvas.getHeight() * 0.6) / (img.height || 1),
-                1,
-              );
-              img.scale(scale);
-              img.set({
-                left: canvas.getWidth() / 2,
-                top: canvas.getHeight() / 2,
-                originX: 'center',
-                originY: 'center',
-              });
-              canvas.add(img);
-              canvas.setActiveObject(img);
-              canvas.renderAll();
-              speak('图片已生成');
-              setLastMessage('图片已添加到画布');
-              saveCanvas();
-            } catch (loadError) {
-              console.error('[VoiceCanvas] 图片加载失败:', loadError);
-              speak('图片加载失败');
-              setLastMessage('图片加载失败，请重试');
-            }
-          } else if (!imageUrl) {
-            setLastMessage('未获取到图片数据');
-            speak('图片生成失败');
+          const result = executeCode(canvasRef.current, firstCommand.code);
+          speak(result.message);
+          setLastMessage(result.message);
+          if (result.success) {
+            saveCanvas();
           }
         } else {
           // 画布操作（支持复合指令批量执行）
@@ -195,8 +150,8 @@ export function useVoiceCanvas(
           msg = '网络连接失败，请检查后端服务是否启动';
         } else if (e.message?.includes('解析') || e.message?.includes('JSON')) {
           msg = '指令理解失败，请换个说法试试';
-        } else if (e.message?.includes('生成') || e.message?.includes('image')) {
-          msg = '图片生成失败，请稍后重试';
+        } else if (e.message?.includes('代码') || e.message?.includes('code')) {
+          msg = '绘图代码执行失败，请换个说法试试';
         }
         speak(msg);
         setLastMessage(msg);
