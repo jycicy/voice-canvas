@@ -6,13 +6,13 @@
 
 ## 功能特性
 
-- 🎤 **语音控制** — 点击麦克风按钮，说出指令即可绘图
-- 🎨 **基础绘图** — 圆形、矩形、三角形、直线、文字
-- 🖼️ **AI 生图** — 语音描述，AI 自动生成图片
-- ✏️ **对象操作** — 选中、移动、缩放、旋转、删除
-- 📐 **画布控制** — 缩放、撤销/重做、导出图片
-- 💬 **建议指令** — 低置信度时展示候选指令列表
+- 🎤 **纯语音控制** — 点击麦克风按钮，说出指令即可绘图，无需键盘鼠标
+- 🎨 **双路径绘图** — 简单图形直接参数绘制，复杂图形由 LLM 生成 Canvas 2D 代码执行
+- ✏️ **丰富图形** — 圆形、矩形、三角形、直线、文字、椭圆，以及渐变、粒子、星空等复杂效果
+- 📐 **画布控制** — 撤销/恢复、清空画布、导出 PNG
+- 💬 **智能建议** — 低置信度时展示编号候选指令，语音说编号即可选择
 - 💾 **状态恢复** — 刷新页面自动恢复画布内容
+- 🔔 **Toast 提示** — 撤销/恢复等操作在画布上方弹出轻量提示
 
 ## 快速启动
 
@@ -35,7 +35,7 @@ npm install
 npm run dev                    # 默认 http://localhost:5173
 ```
 
-打开浏览器访问 http://localhost:5173，点击 🎤 按钮开始语音指令。
+打开浏览器访问 http://localhost:5173，点击 **Try it** 进入绘图页，点击 🎤 按钮开始语音指令。
 
 ## 环境变量
 
@@ -46,12 +46,6 @@ npm run dev                    # 默认 http://localhost:5173
 LLM_API_KEY=your-llm-api-key
 LLM_BASE_URL=https://your-llm-base-url/v1
 LLM_MODEL=mimo-v2.5-pro
-
-# 图像生成（兼容 OpenAI images 格式的任意 API）
-IMAGE_API_URL=https://apihub.agnes-ai.com/v1/images/generations
-IMAGE_API_KEY=your-image-api-key
-IMAGE_MODEL=agnes-image-2.1-flash
-IMAGE_SIZE=1024x768
 ```
 
 ### 前端 (`frontend/.env`)
@@ -60,23 +54,51 @@ IMAGE_SIZE=1024x768
 VITE_API_URL=http://localhost:8000
 ```
 
+## 绘图架构
+
+Voice Canvas 采用**双路径绘图**策略，平衡速度与灵活性：
+
+```
+用户语音 → STT → LLM 解析 → 命令路由
+                                ├─ draw_shape  → 前端直接绘制（快，~0ms）
+                                ├─ code_execute → 沙箱执行 JS 代码（灵活）
+                                └─ canvas_action → 撤销/清空/导出等操作
+```
+
+### 路径一：draw_shape（简单图形）
+
+LLM 返回结构化 JSON 参数，前端直接调用 Canvas 2D API 绘制：
+
+```json
+{"type":"draw_shape","shape":"circle","params":{"x":"W/2","y":"H/2","radius":80,"fill":"#FF6B6B"},"speak":"画了一个红色圆形"}
+```
+
+支持：`circle` / `rect` / `triangle` / `line` / `text` / `ellipse`
+
+### 路径二：code_execute（复杂图形）
+
+LLM 生成 Canvas 2D JavaScript 代码，通过 `new Function()` 沙箱执行：
+
+```json
+{"type":"code_execute","code":"ctx.fillStyle='#0a0a2e'; ctx.fillRect(0,0,W,H); for(let i=0;i<200;i++){...}","speak":"画了一片星空"}
+```
+
+适用于：渐变、粒子、星空、彩虹、房子、树等复杂图案。
+
 ## 语音指令示例
 
-| 指令 | 效果 |
-|------|------|
-| 画一个红色圆形 | 在画布中心绘制红色圆形 |
-| 画一只猫 | AI 生成猫咪图片 |
-| 选中圆形 | 选中画布上的圆形 |
-| 放大两倍 | 将选中对象放大 |
-| 旋转45度 | 旋转选中对象 |
-| 改成蓝色 | 修改选中对象颜色 |
-| 向上移动50 | 移动选中对象 |
-| 添加文字你好世界 | 在画布添加文字 |
-| 放大画布 / 缩小 | 画布缩放 |
-| 撤销 / 重做 | 操作历史 |
-| 保存图片 | 导出为 PNG |
-| 清空画布 | 删除所有对象 |
-| 画三个红色圆形排成一排 | 批量绘制 |
+| 指令 | 效果 | 路径 |
+|------|------|------|
+| 画一个红色圆形 | 在画布中心绘制红色圆形 | draw_shape |
+| 画一个蓝色矩形 | 绘制蓝色矩形 | draw_shape |
+| 写文字你好世界 | 在画布添加文字 | draw_shape |
+| 画一片星空 | LLM 生成星空代码执行 | code_execute |
+| 画一道彩虹 | LLM 生成彩虹渐变代码 | code_execute |
+| 画一座房子 | LLM 生成组合图形代码 | code_execute |
+| 撤销 | 撤销上一步操作 | canvas_action |
+| 恢复 | 恢复撤销的操作 | canvas_action |
+| 清空画布 | 删除所有内容 | canvas_action |
+| 导出图片 | 下载为 PNG | canvas_action |
 
 ## 测试
 
@@ -85,26 +107,35 @@ cd backend
 python -m pytest tests/ -v
 ```
 
-36 个单元测试覆盖：指令解析、图像生成、SSE 端点、画布状态存储。
+28 个单元测试覆盖：指令解析、画布状态存储、API 路由。
 
 ## 项目结构
 
 ```
 voice-canvas/
-├── backend/                # FastAPI 后端
-│   ├── main.py             # 入口 + CORS + 路由注册
-│   ├── prompts/            # LLM prompt 模板
-│   ├── routers/            # API 路由
-│   ├── schemas/            # Pydantic 数据模型
-│   ├── services/           # 业务逻辑
-│   └── tests/              # 测试
-├── frontend/               # React 前端
+├── backend/                    # FastAPI 后端
+│   ├── main.py                 # 入口 + CORS + 路由注册
+│   ├── prompts/                # LLM prompt 模板
+│   │   └── parse_command.txt   # 绘图指令解析 prompt
+│   ├── routers/                # API 路由
+│   ├── schemas/                # Pydantic 数据模型
+│   ├── services/               # 业务逻辑
+│   └── tests/                  # 单元测试
+├── frontend/                   # React 前端
 │   └── src/
-│       ├── components/     # UI 组件
-│       ├── hooks/          # React Hooks
-│       └── lib/            # 工具库
+│       ├── components/         # UI 组件
+│       │   ├── ChatPanel.tsx   # 聊天面板（消息 + 语音按钮）
+│       │   └── DrawingCanvas.tsx # 画布组件
+│       ├── hooks/              # React Hooks
+│       │   └── useVoiceCanvas.ts # 语音绘图主 Hook
+│       ├── lib/                # 工具库
+│       │   ├── canvasExecutor.ts # 命令执行器（draw_shape + code_execute）
+│       │   └── canvasHistory.ts  # 快照式撤销/恢复
+│       └── pages/
+│           ├── LandingPage.tsx # 落地页（Try it 按钮）
+│           └── CanvasPage.tsx  # 绘图页（画布 + 聊天面板）
 └── docs/
-    └── design-doc.md       # 设计文档
+    └── design-doc.md           # 设计文档
 ```
 
 ## 技术栈
@@ -112,8 +143,7 @@ voice-canvas/
 | 层级 | 技术 |
 |------|------|
 | 前端 | React + Vite + TypeScript |
-| 画布 | Fabric.js |
+| 画布 | 原生 Canvas 2D API |
 | 语音 | Web Speech API (STT + TTS) |
 | 后端 | FastAPI + Pydantic |
 | LLM | mimo-v2.5-pro（兼容 OpenAI 格式） |
-| 生图 | Agnes Image 2.1 Flash（兼容 OpenAI images 格式） |
