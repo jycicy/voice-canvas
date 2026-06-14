@@ -10,9 +10,9 @@ from pydantic import BaseModel, Field
 
 
 class CommandType(str, Enum):
-    """命令类型：画布操作 or AI 图像生成"""
+    """命令类型：画布操作 or 代码绘图"""
     CANVAS_ACTION = "canvas_action"
-    AI_GENERATE = "ai_generate"
+    CODE_EXECUTE = "code_execute"
 
 
 class CanvasAction(str, Enum):
@@ -93,7 +93,7 @@ class DrawCommand(BaseModel):
     action: Optional[CanvasAction] = Field(None, description="画布操作类型（type=canvas_action 时必填）")
     target: Optional[DrawTarget] = Field(None, description="操作目标")
     params: Optional[DrawParams] = Field(None, description="绘图参数")
-    prompt: Optional[str] = Field(None, description="AI 绘图提示词（type=ai_generate 时必填）")
+    code: Optional[str] = Field(None, description="Fabric.js 绘图代码（type=code_execute 时必填）")
     confidence: float = Field(1.0, ge=0, le=1, description="解析置信度 0-1")
     speak: str = Field("", description="TTS 语音反馈文本")
     alternatives: list[Alternative] = Field(default_factory=list, description="备选指令列表（低置信度时）")

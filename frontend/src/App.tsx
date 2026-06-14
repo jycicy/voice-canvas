@@ -67,8 +67,7 @@ function App() {
           ))}
         </div>
         <div className="toolbar-right">
-          <span className={`status-msg ${voice.state === 'generating' ? 'status-msg--generating' : ''} ${voice.state === 'parsing' ? 'status-msg--parsing' : ''}`}>
-            {voice.state === 'generating' && '⏳ '}
+          <span className={`status-msg ${voice.state === 'parsing' ? 'status-msg--parsing' : ''}`}>
             {voice.state === 'parsing' && '🤔 '}
             {voice.state === 'executing' && '⚡ '}
             {voice.lastMessage || (voice.state === 'idle' ? '就绪' : '')}
@@ -95,7 +94,7 @@ function App() {
           <input
             type="text"
             className="text-input"
-            placeholder="输入指令，如：画一个红色圆形、撤销、清空画布..."
+            placeholder="输入指令，如：画一个红色圆形、画一座房子、撤销、清空画布..."
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
           />

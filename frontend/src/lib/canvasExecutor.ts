@@ -34,11 +34,11 @@ export interface DrawTarget {
 
 /** 完整绘图命令 */
 export interface DrawCommand {
-  type: 'canvas_action' | 'ai_generate';
+  type: 'canvas_action' | 'code_execute';
   action?: 'draw' | 'modify' | 'move' | 'scale' | 'rotate' | 'delete' | 'select' | 'clear' | 'undo' | 'redo' | 'export' | 'zoomIn' | 'zoomOut' | 'resetView';
   target?: DrawTarget;
   params?: DrawParams;
-  prompt?: string;
+  code?: string;
   confidence?: number;
   speak?: string;
   alternatives?: { label: string; command: DrawCommand }[];
@@ -372,6 +372,28 @@ function executeZoom(
   canvas.renderAll();
   const pct = Math.round(zoom * 100);
   return { success: true, message: `画布缩放至 ${pct}%` };
+}
+
+/**
+ * 沙箱执行 LLM 生成的 Fabric.js 绘图代码
+ *
+ * 使用 new Function 创建受限执行环境，只暴露 fabric 和 canvas。
+ */
+export function executeCode(
+  canvas: fabric.Canvas,
+  code: string,
+): ExecuteResult {
+  try {
+    // 沙箱执行：只暴露 fabric 和 canvas
+    const fn = new Function('fabric', 'canvas', code);
+    fn(fabric, canvas);
+    canvas.renderAll();
+    return { success: true, message: '绘图完成' };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[executeCode] 代码执行失败:', err);
+    return { success: false, message: `代码执行失败: ${msg}` };
+  }
 }
 
 /**

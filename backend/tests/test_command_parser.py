@@ -18,9 +18,16 @@ class TestExtractJson:
 
     def test_markdown_json_block(self):
         """```json 代码块"""
-        text = '```json\n{"type": "ai_generate", "prompt": "cat"}\n```'
+        text = '```json\n{"type": "code_execute", "code": "const c = new fabric.Circle({radius:50});\\ncanvas.add(c);"}\n```'
         result = _extract_json(text)
-        assert result["type"] == "ai_generate"
+        assert result["type"] == "code_execute"
+
+    def test_json_with_single_quotes_in_code(self):
+        """code 字段内包含单引号"""
+        text = '{"type": "code_execute", "code": "const c = new fabric.Circle({fill: \'#FF0000\'});\\ncanvas.add(c);", "confidence": 0.9, "speak": "test"}'
+        result = _extract_json(text)
+        assert result["type"] == "code_execute"
+        assert "#FF0000" in result["code"]
 
     def test_json_with_extra_text(self):
         """JSON 前后有多余文字"""
@@ -55,10 +62,10 @@ class TestBuildFallbackCommand:
         cmd = _build_fallback_command("保存图片")
         assert cmd.action == "export"
 
-    def test_ai_generate(self):
+    def test_code_execute(self):
         cmd = _build_fallback_command("画一只猫")
-        assert cmd.type == CommandType.AI_GENERATE
-        assert cmd.prompt == "一只猫"
+        assert cmd.type == CommandType.CODE_EXECUTE
+        assert cmd.code is not None
 
     def test_unrecognized(self):
         cmd = _build_fallback_command("你好啊")
@@ -112,7 +119,7 @@ class TestParseCommand:
 
             cmd = await parse_command("画一只猫")
 
-        assert cmd.type == CommandType.AI_GENERATE
+        assert cmd.type == CommandType.CODE_EXECUTE
 
     @pytest.mark.asyncio
     async def test_parse_scale_command(self):

@@ -39,9 +39,7 @@ def _extract_json(text: str) -> dict:
     处理各种常见的非标准 JSON 输出情况：
     - 包裹在 ```json ... ``` 中
     - 前后有多余文字
-    - 单引号代替双引号
     """
-    # 尝试直接解析
     text = text.strip()
 
     # 去掉 markdown 代码块
@@ -49,16 +47,51 @@ def _extract_json(text: str) -> dict:
     if json_block:
         text = json_block.group(1).strip()
 
-    # 尝试找到 JSON 对象
-    json_match = re.search(r"\{.*\}", text, re.DOTALL)
-    if json_match:
-        text = json_match.group(0)
-
-    # 替换单引号为双引号（简单场景）
-    text = text.replace("'", '"')
-
     # 移除尾部逗号（LLM 常见错误）
     text = re.sub(r",\s*([}\]])", r"\1", text)
+
+    # 优先尝试直接解析（LLM 通常返回标准 JSON，code 字段可能包含单引号）
+    # 先用栈匹配找到顶层 JSON 对象，避免贪婪匹配破坏 code 字符串
+    start = text.find('{')
+    if start == -1:
+        raise ValueError("未找到 JSON 对象")
+
+    depth = 0
+    in_string = False
+    escape_next = False
+    end = -1
+
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape_next:
+            escape_next = False
+            continue
+        if c == '\\' and in_string:
+            escape_next = True
+            continue
+        if c == '"' and not escape_next:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+
+    if end == -1:
+        # 括号不匹配，尝试修复
+        text = text[start:]
+        if '"speak"' not in text:
+            text += ', "speak": "正在执行"'
+        if '"confidence"' not in text:
+            text += ', "confidence": 0.8'
+        text += '}'
+    else:
+        text = text[start:end + 1]
 
     return json.loads(text)
 
@@ -104,16 +137,14 @@ def _build_fallback_command(text: str) -> DrawCommand:
             speak="正在导出图片",
         )
 
-    # AI 生成：包含"画"但不是基础图形时，走 DALL-E
-    basic_shapes = ["圆", "矩形", "方", "直线", "线", "三角", "正方形", "长方形"]
-    if "画" in text and not any(shape in text for shape in basic_shapes):
-        # 提取"画"后面的内容作为 prompt
-        prompt = text.split("画", 1)[-1].strip() or text
+    # 代码绘图：包含"画"时走代码生成
+    if "画" in text:
+        description = text.split("画", 1)[-1].strip() or text
         return DrawCommand(
-            type=CommandType.AI_GENERATE,
-            prompt=prompt,
+            type=CommandType.CODE_EXECUTE,
+            code=f"// {description}\n// 需要 LLM 生成具体代码",
             confidence=0.5,
-            speak=f"正在尝试生成：{prompt}",
+            speak=f"正在绘制：{description}",
         )
 
     # 无法识别
@@ -239,22 +270,10 @@ async def parse_compound_command(text: str) -> list[DrawCommand]:
     single_text = re.sub(r"[一二三四五六七八九十\d]+\s*个", "一个", text)
     cmd = await parse_command(single_text)
 
-    # 如果解析失败或不是 draw 类型，直接返回单个命令
-    if cmd.type != CommandType.CANVAS_ACTION or cmd.action != "draw":
+    # 如果不是 code_execute 类型，直接返回单个命令
+    if cmd.type != CommandType.CODE_EXECUTE:
         return [cmd]
 
-    # 根据数量生成多个命令，水平排列
-    commands = []
-    spacing = 150  # 对象间距
-    total_width = (count - 1) * spacing
-    start_x = -total_width / 2
-
-    for i in range(count):
-        import copy
-        new_cmd = copy.deepcopy(cmd)
-        if new_cmd.params:
-            new_cmd.params.left = start_x + i * spacing
-        new_cmd.speak = f"正在绘制第 {i + 1} 个"
-        commands.append(new_cmd)
-
-    return commands
+    # code_execute 类型：将数量信息附加到 code 注释中，让 LLM 在下次调用时生成多个对象
+    # 直接返回单个命令（LLM 代码中可以画多个对象）
+    return [cmd]
