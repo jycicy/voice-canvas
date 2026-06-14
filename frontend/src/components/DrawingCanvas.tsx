@@ -7,7 +7,7 @@ interface DrawingCanvasProps {
   historyRef: React.MutableRefObject<CanvasHistory | null>;
 }
 
-export function DrawingCanvas({ canvasRef, historyRef }: DrawingCanvasProps) {
+export default function DrawingCanvas({ canvasRef, historyRef }: DrawingCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const htmlCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -22,7 +22,7 @@ export function DrawingCanvas({ canvasRef, historyRef }: DrawingCanvasProps) {
     const canvas = new fabric.Canvas(htmlCanvasRef.current, {
       width,
       height,
-      backgroundColor: '#1a1a2e',
+      backgroundColor: '#ffffff',
       selection: true,
     });
 
