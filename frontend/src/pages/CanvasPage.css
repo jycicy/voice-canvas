@@ -283,98 +283,51 @@
   border-top: 1px solid #fef3c7;
 }
 
-/* 输入区域 */
-.chat-panel__input-area {
+/* 语音控制区域 */
+.chat-panel__voice-area {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  justify-content: center;
+  padding: 16px;
   border-top: 1px solid #e5e5e5;
   background: #fff;
   flex-shrink: 0;
 }
 
-.chat-panel__input {
-  flex: 1;
-  height: 40px;
-  padding: 0 14px;
-  border: 1px solid #e5e5e5;
-  border-radius: 10px;
-  background: #fafafa;
-  color: #1a1a1a;
-  font-size: 14px;
-  outline: none;
-  transition: all 0.15s;
-}
-
-.chat-panel__input::placeholder {
-  color: #bbb;
-}
-
-.chat-panel__input:focus {
-  border-color: #2563eb;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.chat-panel__input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.chat-panel__send-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 10px;
-  background: #2563eb;
-  color: #fff;
-  cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-
-.chat-panel__send-btn:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-
-.chat-panel__send-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 .chat-panel__mic-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid #e5e5e5;
-  border-radius: 10px;
+  gap: 8px;
+  padding: 12px 32px;
+  border: 2px solid #e5e5e5;
+  border-radius: 40px;
   background: #fff;
-  color: #666;
+  color: #1a1a1a;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
+  transition: all 0.2s;
 }
 
 .chat-panel__mic-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  color: #1a1a1a;
+  border-color: #2563eb;
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.15);
 }
 
 .chat-panel__mic-btn--active {
   border-color: #dc2626;
   background: #fef2f2;
   color: #dc2626;
+  animation: micPulse 1.5s ease-in-out infinite;
 }
 
 .chat-panel__mic-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+@keyframes micPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
 }
 
 /* 麦克风波形动画 */

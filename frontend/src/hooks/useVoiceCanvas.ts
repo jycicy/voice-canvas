@@ -39,7 +39,6 @@ interface VoiceCanvasState {
   stopListening: () => void;
   selectAlternative: (command: DrawCommand) => void;
   executeAction: (action: string) => Promise<void>;
-  submitText: (text: string) => void;
 }
 
 /** 匹配语音选择建议的指令 */
@@ -327,16 +326,6 @@ export function useVoiceCanvas(
     [canvasRef, ctxRef, historyRef, speak, saveCanvas],
   );
 
-  // 文字输入提交
-  const submitText = useCallback(
-    (text: string) => {
-      if (text.trim()) {
-        processText(text.trim());
-      }
-    },
-    [processText],
-  );
-
   // 监听语音识别的 finalText 变化
   useEffect(() => {
     if (speech.finalText && speech.finalText !== lastFinalRef.current) {
@@ -366,6 +355,5 @@ export function useVoiceCanvas(
     stopListening: speech.stop,
     selectAlternative,
     executeAction,
-    submitText,
   };
 }

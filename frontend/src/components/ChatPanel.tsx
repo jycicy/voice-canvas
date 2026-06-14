@@ -1,11 +1,10 @@
 /**
  * 聊天面板 — 右侧对话区
  *
- * 包含：消息列表 + 建议列表 + 输入框 + 语音按钮
+ * 包含：消息列表 + 建议列表 + 语音按钮（纯语音控制）
  */
 
 import { useRef, useEffect } from 'react';
-import type { FormEvent } from 'react';
 import type { ProcessingState } from '../hooks/useVoiceCanvas';
 import type { DrawCommand } from '../lib/canvasExecutor';
 
@@ -32,7 +31,6 @@ interface ChatPanelProps {
   onStartListening: () => void;
   onStopListening: () => void;
   onSelectAlternative: (command: DrawCommand) => void;
-  onSubmitText: (text: string) => void;
   onExport: () => void;
 }
 
@@ -47,11 +45,9 @@ export default function ChatPanel({
   onStartListening,
   onStopListening,
   onSelectAlternative,
-  onSubmitText,
   onExport,
 }: ChatPanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -59,15 +55,6 @@ export default function ChatPanel({
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages]);
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    const input = inputRef.current;
-    if (input && input.value.trim()) {
-      onSubmitText(input.value.trim());
-      input.value = '';
-    }
-  };
 
   const stateLabel: Record<ProcessingState, string> = {
     idle: '就绪',
@@ -98,9 +85,9 @@ export default function ChatPanel({
       <div className="chat-panel__messages" ref={listRef}>
         {messages.length === 0 && (
           <div className="chat-panel__empty">
-            <div className="chat-panel__empty-icon">💬</div>
-            <p>开始对话吧</p>
-            <p className="chat-panel__empty-hint">输入文字或点击麦克风说话</p>
+            <div className="chat-panel__empty-icon">🎤</div>
+            <p>点击麦克风开始</p>
+            <p className="chat-panel__empty-hint">用语音说出你的绘图指令</p>
           </div>
         )}
 
@@ -151,25 +138,8 @@ export default function ChatPanel({
         </div>
       )}
 
-      {/* 输入区域 */}
-      <form className="chat-panel__input-area" onSubmit={handleSubmit}>
-        <input
-          ref={inputRef}
-          type="text"
-          className="chat-panel__input"
-          placeholder="输入绘图指令..."
-          disabled={state !== 'idle'}
-        />
-        <button
-          type="submit"
-          className="chat-panel__send-btn"
-          disabled={state !== 'idle'}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
+      {/* 语音控制区域 */}
+      <div className="chat-panel__voice-area">
         <button
           type="button"
           className={`chat-panel__mic-btn ${isListening ? 'chat-panel__mic-btn--active' : ''}`}
@@ -181,15 +151,16 @@ export default function ChatPanel({
               <span /><span /><span />
             </div>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="23" />
               <line x1="8" y1="23" x2="16" y2="23" />
             </svg>
           )}
+          <span>{isListening ? '停止' : '语音'}</span>
         </button>
-      </form>
+      </div>
     </aside>
   );
 }

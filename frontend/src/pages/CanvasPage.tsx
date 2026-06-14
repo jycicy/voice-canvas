@@ -28,7 +28,6 @@ export default function CanvasPage() {
     stopListening,
     selectAlternative,
     executeAction,
-    submitText,
   } = useVoiceCanvas(canvasRef, ctxRef, historyRef);
 
   // 导出图片
@@ -95,7 +94,6 @@ export default function CanvasPage() {
         onStartListening={startListening}
         onStopListening={stopListening}
         onSelectAlternative={selectAlternative}
-        onSubmitText={submitText}
         onExport={handleExport}
       />
     </div>
